@@ -43,12 +43,12 @@
                 <version>1.7.6</version>
                 <executions>
                     <execution>
-                        <id>default-minify</id>
+                        <id>bwfla-minify</id>
                         <configuration>
                             <charset>UTF-8</charset>
                             <jsEngine>CLOSURE</jsEngine>
 
-                            <jsFinalFile>bwfla-all.min.js</jsFinalFile>
+                            <jsFinalFile>bwfla-all.js</jsFinalFile>
 
                             <jsSourceIncludes>
                                 <jsSourceInclude>**</jsSourceInclude>
@@ -56,6 +56,26 @@
 
                             <jsSourceDir>/</jsSourceDir>
                             <webappSourceDir>${basedir}/src</webappSourceDir>
+                        </configuration>
+                        <goals>
+                            <goal>minify</goal>
+                        </goals>
+                    </execution>
+
+                    <execution>
+                        <id>guacamole-minify</id>
+                        <configuration>
+                            <charset>UTF-8</charset>
+                            <jsEngine>CLOSURE</jsEngine>
+
+                            <jsFinalFile>guacamole-all.js</jsFinalFile>
+
+                            <jsSourceIncludes>
+                                <jsSourceInclude>**</jsSourceInclude>
+                            </jsSourceIncludes>
+
+                            <jsSourceDir>/</jsSourceDir>
+                            <webappSourceDir>${basedir}/resources/guacamole/js</webappSourceDir>
                         </configuration>
                         <goals>
                             <goal>minify</goal>
