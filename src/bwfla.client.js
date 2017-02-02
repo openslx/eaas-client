@@ -11,7 +11,6 @@ EaasClient.Client = function(api_entrypoint, container) {
     });
   };
 
-
   this.pollState = function(controlurl, componentId) {
     $.get(controlurl + "/state")
       .done(function (data) {
@@ -66,19 +65,16 @@ EaasClient.Client = function(api_entrypoint, container) {
   }
 
   this.establishGuacamoleTunnel = function(controlUrl) {
-        window.onbeforeunload = function()
-        {
-            this.guac.disconnect();
-        }.bind(this);
-       
-        $.fn.focusWithoutScrolling = function()
-        {
-            var x = window.scrollX, y = window.scrollY;
-            this.focus();
-            window.scrollTo(x, y);
-            return this;
-        };
-          
+    window.onbeforeunload = function() {
+        this.guac.disconnect();
+    }.bind(this);
+
+    $.fn.focusWithoutScrolling = function() {
+        var x = window.scrollX, y = window.scrollY;
+        this.focus();
+        window.scrollTo(x, y);
+        return this;
+    };
        
     this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl + "/tunnel"));
     var displayElement = this.guac.getDisplay().getElement();
