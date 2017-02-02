@@ -14,7 +14,7 @@
 
     <build>
         <plugins>
-            <!-- Assemble JS files into single .zip
+            <!-- Assemble JS files into single .zip -->
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>2.5.3</version>
@@ -34,7 +34,6 @@
                     </execution>
                 </executions>
             </plugin>
-            -->
 
             <!-- JS/CSS Minification Plugin -->
             <plugin>
@@ -46,15 +45,16 @@
                         <id>bwfla-minify</id>
                         <configuration>
                             <charset>UTF-8</charset>
+
+                            <cssTargetDir>/</cssTargetDir>
+
                             <jsEngine>CLOSURE</jsEngine>
-
                             <jsFinalFile>bwfla-all.js</jsFinalFile>
-
                             <jsSourceIncludes>
                                 <jsSourceInclude>**</jsSourceInclude>
                             </jsSourceIncludes>
-
                             <jsSourceDir>/</jsSourceDir>
+
                             <webappSourceDir>${basedir}/src</webappSourceDir>
                         </configuration>
                         <goals>
@@ -66,16 +66,21 @@
                         <id>guacamole-minify</id>
                         <configuration>
                             <charset>UTF-8</charset>
+
+                            <cssFinalFile>guacamole.css</cssFinalFile>
+                            <cssSourceIncludes>
+                                <cssSourceInclude>**</cssSourceInclude>
+                            </cssSourceIncludes>
+                            <cssTargetDir>/guacamole</cssTargetDir>
+
                             <jsEngine>CLOSURE</jsEngine>
-
                             <jsFinalFile>guacamole-all.js</jsFinalFile>
-
                             <jsSourceIncludes>
                                 <jsSourceInclude>**</jsSourceInclude>
                             </jsSourceIncludes>
+                            <jsTargetDir>/guacamole</jsTargetDir>
 
-                            <jsSourceDir>/</jsSourceDir>
-                            <webappSourceDir>${basedir}/resources/guacamole/js</webappSourceDir>
+                            <webappSourceDir>${basedir}/resources/guacamole/</webappSourceDir>
                         </configuration>
                         <goals>
                             <goal>minify</goal>
