@@ -50,8 +50,8 @@
                             <cssSourceIncludes>
                                 <cssSourceInclude>**</cssSourceInclude>
                             </cssSourceIncludes>
-                            <jsSourceDir>/css</jsSourceDir>
-                            <jsTargetDir>/</jsTargetDir>
+                            <cssSourceDir>/css</cssSourceDir>
+                            <cssTargetDir>/</cssTargetDir>
 
                             <jsEngine>CLOSURE</jsEngine>
                             <jsFinalFile>${project.name}.js</jsFinalFile>
