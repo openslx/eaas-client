@@ -85,13 +85,6 @@ EaasClient.Client = function(api_entrypoint, container) {
     BWFLA.registerEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
     this.guac.connect();
 
-    /*
-    /window.addEventListener("message", function(event) {
-      // any messeage will cause a fullscreen event for now
-      screenfull.request(displayElement);
-    });
-    */
-
     var mouse = new Guacamole.Mouse(displayElement);
     var touch = new Guacamole.Mouse.Touchpad(displayElement);
     var mousefix = new BwflaMouse(this.guac);
