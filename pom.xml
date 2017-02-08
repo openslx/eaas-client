@@ -46,14 +46,20 @@
                         <configuration>
                             <charset>UTF-8</charset>
 
-                            <cssTargetDir>/</cssTargetDir>
+                            <cssFinalFile>${project.name}.css</cssFinalFile>
+                            <cssSourceIncludes>
+                                <cssSourceInclude>**</cssSourceInclude>
+                            </cssSourceIncludes>
+                            <jsSourceDir>/css</jsSourceDir>
+                            <jsTargetDir>/</jsTargetDir>
 
                             <jsEngine>CLOSURE</jsEngine>
                             <jsFinalFile>${project.name}.js</jsFinalFile>
                             <jsSourceIncludes>
                                 <jsSourceInclude>**</jsSourceInclude>
                             </jsSourceIncludes>
-                            <jsSourceDir>/</jsSourceDir>
+                            <jsSourceDir>/js</jsSourceDir>
+                            <jsTargetDir>/</jsTargetDir>
 
                             <webappSourceDir>${basedir}/src</webappSourceDir>
                         </configuration>
