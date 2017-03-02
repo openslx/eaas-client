@@ -1,8 +1,13 @@
 var EaasClient = EaasClient || {};
 
 EaasClient.Client = function(api_entrypoint, container) {
+  var _this = this;
+  
   var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/');
   var container = container;
+  
+  this.componentId = null;
+  this.networkId = null;
 
   function formatStr(format) {
     var args = Array.prototype.slice.call(arguments, 1);
@@ -11,32 +16,27 @@ EaasClient.Client = function(api_entrypoint, container) {
     });
   };
 
-  this.pollState = function(controlurl, componentId) {
-    $.get(controlurl + "/state")
-      .done(function (data) {
-        if (data.state == "running") {
-          if (!this.guac) {
-            this.establishGuacamoleTunnel(controlurl);
-            this.keepaliveIntervalId = setInterval(this.keepalive.bind(this, componentId), 1000);
+  this.pollState = function(componentId) {
+    $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
+    
+    .then(function(data, status, xhr) {
+      if (!_this.guac) {
+        
+        $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
+        .then(function(data, status, xhr) {
+          console.log(data);
+          _this.establishGuacamoleTunnel(data.guacamole);
+          _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
+        })
+        
 
-            if (this.onConnect) {
-              this.onConnect();
-            }
-          }
-          setTimeout(this.pollState.bind(this), 1000, controlurl, componentId);
-        } else if (data.state == "failed") {
-          this._onError("An internal server error occurred");
-        } else if (data.state == "client_fault") {
-          this._onError("A client error occurred");
-        } else if (data.state == "stopped") {
-          this._onError("The emulator was stopped");
-        } else {
-          setTimeout(this.pollState.bind(this), 1000, controlurl, componentId);
+        if (_this.onConnect) {
+          _this.onConnect();
         }
-      }.bind(this))
-      .fail(function(xhr, textStatus, error) {
-        this._onError("Could not determine component state");
-      }.bind(this));
+      }
+    }, function(xhr) {
+      _this._onError($.parseJSON(xhr.responseText).message)
+    })
   }
 
   this._onError = function(msg) {
@@ -58,10 +58,15 @@ EaasClient.Client = function(api_entrypoint, container) {
     }
   }
 
-  this.keepalive = function(componentId) {
-    var keepalive = "/{0}/keepalive";
-
-    $.post(API_URL + formatStr(keepalive, componentId));
+  this.keepalive = function() {
+    var url = null;
+    if (_this.networkId != null) {
+      url = formatStr("/networks/{0}/keepalive", _this.networkId);
+    } else if (_this.componentId != null) {
+      url = formatStr("/components/{0}/keepalive", _this.componentId);
+    }
+    
+    $.post(API_URL + url);
   }
 
   this.establishGuacamoleTunnel = function(controlUrl) {
@@ -76,7 +81,8 @@ EaasClient.Client = function(api_entrypoint, container) {
         return this;
     };
        
-    this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl + "/tunnel"));
+    console.log(controlUrl);
+    this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl));
     var displayElement = this.guac.getDisplay().getElement();
 
     BWFLA.hideClientCursor(this.guac);
@@ -131,20 +137,100 @@ EaasClient.Client = function(api_entrypoint, container) {
 
 
 
-  this.startEnvironment = function(environmentId, kbLanguage, kbLayout) {
-    var configureEnv = "/configureEnv?envId={0}&language={1}&layout={2}";
-
-    $.get(API_URL + formatStr(configureEnv, environmentId,
-        kbLanguage || "us", kbLayout || "pc105")).
-      done(function (data) {
-        if (data.status == 0) {
-          this.pollState(data.iframeurl.replace(/([^:])(\/\/+)/g, '$1/'), data.id);
-        } else {
-          this._onError(data.message);
-        }
-      }.bind(this))
-      .fail(function(xhr, textStatus, error) {
-        this._onError($.parseJSON(xhr.responseText).message);
-      }.bind(this));
+  this.startEnvironment = function(environmentId, args) {
+    var data = {};
+    data.type = "machine";
+    data.environment = environmentId;
+    
+    if (typeof args !== "undefined") {
+      data.keyboardLayout = args.keyboardLayout;
+      data.keyboardModel = args.keyboardModel;
+      data.object = args.object;
+      
+      if (args.object == null) {
+        data.software = args.software;
+      }
+    }
+    
+    $.ajax({
+      type: "POST",
+      url: API_URL + "/components",
+      data: JSON.stringify(data),
+      contentType: "application/json"
+    })
+    .then(function(data, status, xhr) {
+      _this.componentId = data.id;
+      _this.pollState();
+    }, function(xhr) {
+      _this._onError($.parseJSON(xhr.responseText).message)
+    });
   }
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  this.startEnvironmentWithInternet = function(environmentId, kbLanguage,
+      kbLayout) {
+    $.ajax({
+      type : "POST",
+      url : API_URL + "/components",
+      data : JSON.stringify({
+        environment : environmentId,
+        keyboardLayout : kbLanguage,
+        keyboardModel : kbLayout
+      }),
+      contentType : "application/json"
+    }).done(
+        function(data) {
+          this.tmpdata = data;
+          console.log(this.tmpdata);
+          $.ajax({
+            type : "POST",
+            url : API_URL + "/networks",
+            data : JSON.stringify({
+              components : [ {
+                componentId : data.id
+              } ],
+              hasInternet : true
+            }),
+            contentType : "application/json"
+          }).done(
+              function(data2) {
+                this.pollState(this.tmpdata.controlUrl.replace(
+                    /([^:])(\/\/+)/g, '$1/'), this.tmpdata.id);
+              }.bind(this)).fail(function(xhr, textStatus, error) {
+            this._onError($.parseJSON(xhr.responseText).message);
+          }.bind(this));
+
+        }.bind(this)).fail(function(xhr, textStatus, error) {
+      console.log(xhr.responseText);
+      //this._onError($.parseJSON(xhr.responseText).message);
+    }.bind(this));
+  }
+  
 }
