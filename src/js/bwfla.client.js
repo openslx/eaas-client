@@ -3,7 +3,7 @@ var EaasClient = EaasClient || {};
 EaasClient.Client = function(api_entrypoint, container) {
   var _this = this;
   
-  var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/');
+  var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
   var container = container;
   
   this.componentId = null;
