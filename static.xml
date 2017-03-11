@@ -16,14 +16,6 @@
         </fileSet>
 
         <fileSet>
-            <directory>resources/images</directory>
-            <includes>
-                <include>*</include>
-            </includes>
-            <outputDirectory>images</outputDirectory>
-        </fileSet>
-
-        <fileSet>
             <directory>target/${project.name}-${project.version}/guacamole</directory>
             <includes>
                 <include>*</include>
