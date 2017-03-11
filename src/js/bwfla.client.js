@@ -168,7 +168,9 @@ EaasClient.Client = function(api_entrypoint, container) {
     });
   }
   
-  
+  this.getScreenshotUrl = function() {	  
+    return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
+  }
   
   
   
