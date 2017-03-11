@@ -8,6 +8,7 @@ EaasClient.Client = function(api_entrypoint, container) {
   
   this.componentId = null;
   this.networkId = null;
+  this.driveId = null;
 
   function formatStr(format) {
     var args = Array.prototype.slice.call(arguments, 1);
@@ -160,6 +161,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     })
     .then(function(data, status, xhr) {
       _this.componentId = data.id;
+	  _this.driveId = data.driveId;
       _this.pollState();
     }, function(xhr) {
       _this._onError($.parseJSON(xhr.responseText).message)
