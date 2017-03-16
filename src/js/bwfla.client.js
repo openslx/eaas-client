@@ -17,6 +17,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     });
   };
 
+  var hasConnected = false;
   this.pollState = function(componentId) {
     $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
     
@@ -31,14 +32,39 @@ EaasClient.Client = function(api_entrypoint, container) {
         })
         
 
-        if (_this.onConnect) {
-          _this.onConnect();
+        // call onConnectListeners
+        hasConnected = true;
+
+        for (var i = 0; i < listeners.length; i++) {
+            // don't call removed listeners..
+            if (listeners[i]) {
+                listeners[i]();
+            }
         }
+        
       }
     }, function(xhr) {
       _this._onError($.parseJSON(xhr.responseText).message)
     })
   }
+  
+  var listeners = [];
+  this.addOnConnectListener = function(callback) {
+    // immediately execute callback when already connected
+    if (hasConnected) {
+        callback();
+        return {remove: function(){}}
+    }
+
+    var index = listeners.push(callback) - 1;
+
+    // can be used to remove the listener
+    return {
+      remove: function() {
+        delete listeners[index];
+      }
+    };
+  };
 
   this._onError = function(msg) {
     if (this.keepaliveIntervalId)
@@ -161,20 +187,20 @@ EaasClient.Client = function(api_entrypoint, container) {
     })
     .then(function(data, status, xhr) {
       _this.componentId = data.id;
-	  _this.driveId = data.driveId;
+      _this.driveId = data.driveId;
       _this.pollState();
     }, function(xhr) {
       _this._onError($.parseJSON(xhr.responseText).message)
     });
   }
   
-  this.getScreenshotUrl = function() {	  
+  this.getScreenshotUrl = function() {  
     return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
   }
   
   this.stopEnvironment = function() {
-	  this.guac.disconnect();
-	  $(container).empty();
+      this.guac.disconnect();
+      $(container).empty();
   }
   
   
