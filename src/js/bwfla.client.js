@@ -172,7 +172,10 @@ EaasClient.Client = function(api_entrypoint, container) {
     return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
   }
   
-  
+  this.stopEnvironment = function() {
+	  this.guac.disconnect();
+	  $(container).empty();
+  }
   
   
   
