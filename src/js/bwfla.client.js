@@ -26,7 +26,6 @@ EaasClient.Client = function(api_entrypoint, container) {
         
         $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
         .then(function(data, status, xhr) {
-          console.log(data);
           _this.establishGuacamoleTunnel(data.guacamole);
           _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
         })
@@ -108,12 +107,11 @@ EaasClient.Client = function(api_entrypoint, container) {
         return this;
     };
        
-    console.log(controlUrl);
     this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl));
     var displayElement = this.guac.getDisplay().getElement();
 
     BWFLA.hideClientCursor(this.guac);
-    container.prepend(displayElement);
+    container.insertBefore(displayElement, container.firstChild);
 
     BWFLA.registerEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
     this.guac.connect();
@@ -241,7 +239,6 @@ EaasClient.Client = function(api_entrypoint, container) {
     }).done(
         function(data) {
           this.tmpdata = data;
-          console.log(this.tmpdata);
           $.ajax({
             type : "POST",
             url : API_URL + "/networks",
@@ -261,7 +258,6 @@ EaasClient.Client = function(api_entrypoint, container) {
           }.bind(this));
 
         }.bind(this)).fail(function(xhr, textStatus, error) {
-      console.log(xhr.responseText);
       //this._onError($.parseJSON(xhr.responseText).message);
     }.bind(this));
   }
