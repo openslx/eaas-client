@@ -43,7 +43,7 @@ EaasClient.Client = function(api_entrypoint, container) {
         
       }
     }, function(xhr) {
-      _this._onError($.parseJSON(xhr.responseText).message)
+      _this._onError($.parseJSON(xhr.responseText))
     })
   }
   
@@ -71,7 +71,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     if (this.guac)
       this.guac.disconnect();
     if (this.onError) {
-      this.onError(msg || "No error message specified");
+      this.onError(msg || { "error": "No error message specified"});
     }
   }
 
@@ -188,7 +188,7 @@ EaasClient.Client = function(api_entrypoint, container) {
       _this.driveId = data.driveId;
       _this.pollState();
     }, function(xhr) {
-      _this._onError($.parseJSON(xhr.responseText).message)
+      _this._onError($.parseJSON(xhr.responseText))
     });
   }
   
@@ -254,7 +254,7 @@ EaasClient.Client = function(api_entrypoint, container) {
                 this.pollState(this.tmpdata.controlUrl.replace(
                     /([^:])(\/\/+)/g, '$1/'), this.tmpdata.id);
               }.bind(this)).fail(function(xhr, textStatus, error) {
-            this._onError($.parseJSON(xhr.responseText).message);
+            this._onError($.parseJSON(xhr.responseText));
           }.bind(this));
 
         }.bind(this)).fail(function(xhr, textStatus, error) {
