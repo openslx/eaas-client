@@ -199,7 +199,7 @@ EaasClient.Client = function(api_entrypoint, container) {
   this.stopEnvironment = function() {
       this.guac.disconnect();
       $(container).empty();
-	  clearInterval(this.keepaliveIntervalId);
+      clearInterval(this.keepaliveIntervalId);
   }
   
   
