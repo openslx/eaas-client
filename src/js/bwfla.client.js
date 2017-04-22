@@ -194,13 +194,21 @@ EaasClient.Client = function(api_entrypoint, container) {
   
   this.getScreenshotUrl = function() {  
     return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
-  }
+  };
   
   this.stopEnvironment = function() {
-      this.guac.disconnect();
-      $(container).empty();
-      clearInterval(this.keepaliveIntervalId);
-  }
+    this.guac.disconnect();
+    $(container).empty();
+  };
+
+  this.clearTimer = function () {
+    clearInterval(this.keepaliveIntervalId);
+  };
+
+  this.release = function () {
+      this.stopEnvironment();
+      this.clearTimer();
+  };
   
   
   
