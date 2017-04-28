@@ -107,7 +107,7 @@ EaasClient.Client = function(api_entrypoint, container) {
         return this;
     };
        
-    this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl));
+    this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
     var displayElement = this.guac.getDisplay().getElement();
 
     BWFLA.hideClientCursor(this.guac);
