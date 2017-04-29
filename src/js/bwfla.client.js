@@ -4,18 +4,29 @@ EaasClient.Client = function(api_entrypoint, container) {
   var _this = this;
   
   var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
-  var container = container;
-  
+
   this.componentId = null;
   this.networkId = null;
   this.driveId = null;
+  this.params = null;
 
   function formatStr(format) {
     var args = Array.prototype.slice.call(arguments, 1);
     return format.replace(/{(\d+)}/g, function(match, number) {
       return typeof args[number] != 'undefined' ? args[number] : match;
     });
-  };
+  }
+
+  function strParamsToObject(str) {
+    var result = {};
+    if (!str) return result; // return on empty string
+
+    str.split("&").forEach(function(part) {
+      var item = part.split("=");
+        result[item[0]] = decodeURIComponent(item[1]);
+      });
+    return result;
+  }
 
   var hasConnected = false;
   this.pollState = function(componentId) {
@@ -26,9 +37,10 @@ EaasClient.Client = function(api_entrypoint, container) {
         
         $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
         .then(function(data, status, xhr) {
+          _this.params = strParamsToObject(controlUrl.substring(controlUrl.indexOf("#") + 1));
           _this.establishGuacamoleTunnel(data.guacamole);
           _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
-        })
+        });
         
 
         // call onConnectListeners
@@ -45,7 +57,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     }, function(xhr) {
       _this._onError($.parseJSON(xhr.responseText))
     })
-  }
+  };
   
   var listeners = [];
   this.addOnConnectListener = function(callback) {
@@ -73,7 +85,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     if (this.onError) {
       this.onError(msg || { "error": "No error message specified"});
     }
-  }
+  };
 
   this._onResize = function(width, height) {
     container.style.width = width;
@@ -82,7 +94,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     if (this.onResize) {
       this.onResize(width, height);
     }
-  }
+  };
 
   this.keepalive = function() {
     var url = null;
@@ -93,7 +105,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     }
     
     $.post(API_URL + url);
-  }
+  };
 
   this.establishGuacamoleTunnel = function(controlUrl) {
     window.onbeforeunload = function() {
@@ -158,7 +170,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     oskeyboard.onkeydown = function (keysym) { guac.sendKeyEvent(1, keysym); };
     oskeyboard.onkeyup = function (keysym) { guac.sendKeyEvent(0, keysym); };
     */
-  }
+  };
 
 
 
@@ -190,7 +202,7 @@ EaasClient.Client = function(api_entrypoint, container) {
     }, function(xhr) {
       _this._onError($.parseJSON(xhr.responseText))
     });
-  }
+  };
   
   this.getScreenshotUrl = function() {  
     return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
@@ -271,4 +283,4 @@ EaasClient.Client = function(api_entrypoint, container) {
     }.bind(this));
   }
   
-}
+};
