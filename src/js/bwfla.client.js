@@ -37,7 +37,7 @@ EaasClient.Client = function(api_entrypoint, container) {
         
         $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
         .then(function(data, status, xhr) {
-          _this.params = strParamsToObject(controlUrl.substring(controlUrl.indexOf("#") + 1));
+          _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
           _this.establishGuacamoleTunnel(data.guacamole);
           _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
         });
@@ -118,7 +118,7 @@ EaasClient.Client = function(api_entrypoint, container) {
         window.scrollTo(x, y);
         return this;
     };
-       
+
     this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
     var displayElement = this.guac.getDisplay().getElement();
 
