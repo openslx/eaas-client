@@ -40,19 +40,17 @@ EaasClient.Client = function(api_entrypoint, container) {
           _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
           _this.establishGuacamoleTunnel(data.guacamole);
           _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
+
+          // call onConnectListeners
+          hasConnected = true;
+
+          for (var i = 0; i < listeners.length; i++) {
+              // don't call removed listeners..
+              if (listeners[i]) {
+                  listeners[i]();
+              }
+          }
         });
-        
-
-        // call onConnectListeners
-        hasConnected = true;
-
-        for (var i = 0; i < listeners.length; i++) {
-            // don't call removed listeners..
-            if (listeners[i]) {
-                listeners[i]();
-            }
-        }
-        
       }
     }, function(xhr) {
       _this._onError($.parseJSON(xhr.responseText))
