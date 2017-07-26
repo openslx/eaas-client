@@ -6,3 +6,12 @@ To get the concatenated and minified build you simple run `mvn package` inside t
 
 ## Dependencies
 The project is dependent on jQuery.
+
+## How to run
+The user should include following scripts in his HTML/HEAD:
+```
+/target/eaas-client-0.0.3/guacamole/guacamole.js
+/target/eaas-client-0.0.3/eaas-client.js
+/resources/eaas-client/resources/xpra/js/lib/jquery.js
+/resources/eaas-client/resources/xpra/js/lib/aurora/aurora.js
+```
