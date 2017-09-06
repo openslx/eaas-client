@@ -43,6 +43,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             var item = part.split("=");
             result[item[0]] = decodeURIComponent(item[1]);
         });
+        return result
     }
 
 
@@ -59,9 +60,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                             /**
                              * XPRA Section
                              */
-                            xpra = "xpra";
 
-                            if (data.xpra.indexOf(xpra) > -1) {
+                            if (data.toString().indexOf("xpra") > -1) {
                                 console.log("my link" + data.xpra);
                                 _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
                                 /**
@@ -268,6 +268,11 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     this.stopEnvironment = function () {
         this.guac.disconnect();
+        $.ajax({
+            type: "GET",
+            url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
+            async: false,
+        });
         $(container).empty();
     };
 
@@ -278,6 +283,18 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.release = function () {
         this.stopEnvironment();
         this.clearTimer();
+    };
+
+    this.changeMedia = function (postObj, onChangeDone) {
+        $.ajax({
+            type: "POST",
+            url: API_URL + formatStr("/components/{0}/changeMedia", _this.componentId),
+            data: JSON.stringify(postObj),
+            contentType: "application/json"
+        })
+            .then(function (data, status, xhr) {
+                onChangeDone(data, status);
+            });
     };
 
     function prepareAndLoadXpra(xpraUrl) {
