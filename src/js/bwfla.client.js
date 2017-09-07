@@ -660,6 +660,171 @@ EaasClient.Client = function (api_entrypoint, container) {
             XpraClient.prototype._get_DPI = function () {
                 return xpraShapes.xpraDPI;
             }
+
+
+            XpraClient.prototype._process_hello = function(packet, ctx) {
+                //show("process_hello("+packet+")");
+                // clear hello timer
+                if(ctx.hello_timer) {
+                    clearTimeout(ctx.hello_timer);
+                    ctx.hello_timer = null;
+                }
+                var hello = packet[1];
+                ctx.server_remote_logging = hello["remote-logging.multi-line"];
+                if(ctx.server_remote_logging && ctx.remote_logging) {
+                    //hook remote logging:
+                    Utilities.log = function() { ctx.log.apply(ctx, arguments); };
+                    Utilities.warn = function() { ctx.warn.apply(ctx, arguments); };
+                    Utilities.error = function() { ctx.error.apply(ctx, arguments); };
+                }
+
+                // check for server encryption caps update
+                if(ctx.encryption) {
+                    ctx.cipher_out_caps = {
+                        "cipher"					: hello['cipher'],
+                        "cipher.iv"					: hello['cipher.iv'],
+                        "cipher.key_salt"			: hello['cipher.key_salt'],
+                        "cipher.key_stretch_iterations"	: hello['cipher.key_stretch_iterations'],
+                    };
+                    ctx.protocol.set_cipher_out(ctx.cipher_out_caps, ctx.encryption_key);
+                }
+                // find the modifier to use for Num_Lock
+                var modifier_keycodes = hello['modifier_keycodes']
+                if (modifier_keycodes) {
+                    for (var modifier in modifier_keycodes) {
+                        if (modifier_keycodes.hasOwnProperty(modifier)) {
+                            var mappings = modifier_keycodes[modifier];
+                            for (var keycode in mappings) {
+                                var keys = mappings[keycode];
+                                for (var index in keys) {
+                                    var key=keys[index];
+                                    if (key=="Num_Lock") {
+                                        ctx.num_lock_mod = modifier;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                var version = hello["version"];
+                if(version != "2.1.1")
+                    alert("incompatible xpra version");
+                try {
+                    var vparts = version.split(".");
+                    var vno = [];
+                    for (var i=0; i<vparts.length;i++) {
+                        vno[i] = parseInt(vparts[i]);
+                    }
+                    if (vno[0]<=0 && vno[1]<10) {
+                        ctx.callback_close("unsupported version: " + version);
+                        ctx.close();
+                        return;
+                    }
+                }
+                catch (e) {
+                    ctx.callback_close("error parsing version number '" + version + "'");
+                    ctx.close();
+                    return;
+                }
+                ctx.log("got hello: server version "+version+" accepted our connection");
+                //figure out "alt" and "meta" keys:
+                if ("modifier_keycodes" in hello) {
+                    var modifier_keycodes = hello["modifier_keycodes"];
+                    for (var mod in modifier_keycodes) {
+                        //show("modifier_keycode["+mod+"]="+modifier_keycodes[mod].toSource());
+                        var keys = modifier_keycodes[mod];
+                        for (var i=0; i<keys.length; i++) {
+                            var key = keys[i];
+                            //the first value is usually the integer keycode,
+                            //the second one is the actual key name,
+                            //doesn't hurt to test both:
+                            for (var j=0; j<key.length; j++) {
+                                if ("Alt_L"==key[j])
+                                    ctx.alt_modifier = mod;
+                                if ("Meta_L"==key[j])
+                                    ctx.meta_modifier = mod;
+                            }
+                        }
+                    }
+                }
+                //show("alt="+alt_modifier+", meta="+meta_modifier);
+                // stuff that must be done after hello
+                if(ctx.audio_enabled) {
+                    if(!(hello["sound.send"])) {
+                        ctx.error("server does not support speaker forwarding");
+                        ctx.audio_enabled = false;
+                    }
+                    else {
+                        ctx.server_audio_codecs = hello["sound.encoders"];
+                        if(!ctx.server_audio_codecs) {
+                            ctx.error("audio codecs missing on the server");
+                            ctx.audio_enabled = false;
+                        }
+                        else {
+                            ctx.log("audio codecs supported by the server:", ctx.server_audio_codecs);
+                            if(ctx.server_audio_codecs.indexOf(ctx.audio_codec)<0) {
+                                ctx.warn("audio codec "+ctx.audio_codec+" is not supported by the server");
+                                ctx.audio_codec = null;
+                                //find the best one we can use:
+                                for(var i = 0; i < MediaSourceConstants.PREFERRED_CODEC_ORDER.length; i++) {
+                                    var codec = MediaSourceConstants.PREFERRED_CODEC_ORDER[i];
+                                    if ((codec in ctx.audio_codecs) && (ctx.server_audio_codecs.indexOf(codec)>=0)){
+                                        if (ctx.mediasource_codecs[codec]) {
+                                            ctx.audio_framework = "mediasource";
+                                        }
+                                        else {
+                                            ctx.audio_framework = "aurora";
+                                        }
+                                        ctx.audio_codec = codec;
+                                        ctx.log("using", ctx.audio_framework, "audio codec", codec);
+                                        break;
+                                    }
+                                }
+                                if(!ctx.audio_codec) {
+                                    ctx.warn("audio codec: no matches found");
+                                    ctx.audio_enabled = false;
+                                }
+                            }
+                        }
+                        if (ctx.audio_enabled) {
+                            ctx._sound_start_receiving();
+                        }
+                    }
+                }
+                ctx.server_is_desktop = Boolean(hello["desktop"]) || Boolean(hello["shadow"]);
+                if (ctx.server_is_desktop) {
+                    jQuery("body").addClass("desktop");
+                }
+                ctx.server_screen_sizes = hello["screen-sizes"] || [];
+                console.log("server screen sizes:", ctx.server_screen_sizes)
+
+                ctx.remote_open_files = Boolean(hello["open-files"]);
+                ctx.remote_file_transfer = Boolean(hello["file-transfer"]);
+                ctx.remote_printing = Boolean(hello["printing"]);
+                if (ctx.remote_printing && ctx.printing) {
+                    // send our printer definition
+                    var printers = {
+                        "HTML5 client": {
+                            "printer-info": "Print to PDF in client browser",
+                            "printer-make-and-model": "HTML5 client version",
+                            "mimetypes": ["application/pdf"]
+                        }
+                    };
+                    ctx.send(["printers", printers]);
+                }
+                // start sending our own pings
+                ctx._send_ping();
+                ctx.ping_timer = setInterval(function () {
+                    ctx._send_ping();
+                    return true;
+                }, ctx.PING_FREQUENCY);
+                ctx.reconnect_attempt = 0;
+                ctx.on_connection_progress("Session started", "", 100);
+                ctx.on_connect();
+            }
+
+
             /**
              * Connect
              * @type {XpraClient.connect}
