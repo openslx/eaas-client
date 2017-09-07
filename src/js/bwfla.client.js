@@ -61,7 +61,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                              * XPRA Section
                              */
 
-                            if (data.toString().indexOf("xpra") > -1) {
+                            if (typeof data.xpra !== "undefined" > -1) {
                                 console.log("my link" + data.xpra);
                                 _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
                                 /**
@@ -308,58 +308,50 @@ EaasClient.Client = function (api_entrypoint, container) {
                 var eaasClientPath = scripts[prop].src;
             }
         }
-        var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra/";
+        var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra";
 
         $.when(
-            $.getScript(xpraPath + '/js/lib/jquery-ui.js'),
-            $.getScript(xpraPath + '/js/lib/jquery.ba-throttle-debounce.js'),
+            $.getScript(xpraPath + '/www/js/lib/jquery-ui.js'),
+            $.getScript(xpraPath + '/www/js/lib/jquery.ba-throttle-debounce.js'),
 
-            $.getScript(xpraPath + '/js/lib/bencode.js'),
-            $.getScript(xpraPath + '/js/lib/zlib.js'),
-            $.getScript(xpraPath + '/js/lib/lz4.js'),
-            $.getScript(xpraPath + '/js/lib/forge.js'),
+            $.getScript(xpraPath + '/www/js/lib/bencode.js'),
+            $.getScript(xpraPath + '/www/js/lib/zlib.js'),
+            $.getScript(xpraPath + '/www/js/lib/lz4.js'),
+            $.getScript(xpraPath + '/www/js/lib/forge.js'),
 
-            $.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
-            $.getScript(xpraPath + '/js/lib/aurora/aurora-xpra.js'),
+            $.getScript(xpraPath + '/www/js/lib/broadway/Decoder.js'),
+            $.getScript(xpraPath + '/www/js/lib/aurora/aurora-xpra.js'),
 
-            $.getScript(xpraPath + '/js/Utilities.js'),
-            $.getScript(xpraPath + '/js/Keycodes.js'),
-            $.getScript(xpraPath + '/js/Notifications.js'),
-            $.getScript(xpraPath + '/js/MediaSourceUtil.js'),
-            $.getScript(xpraPath + '/js/Window.js'),
-            $.getScript(xpraPath + '/js/Protocol.js'),
-            $.getScript(xpraPath + '/js/Client.js'),
-            // loadScript(xpraUrl + '/js/Protocol.js'),
+            $.getScript(xpraPath + '/www/js/Utilities.js'),
+            $.getScript(xpraPath + '/www/js/Keycodes.js'),
+            $.getScript(xpraPath + '/www/js/Notifications.js'),
+            $.getScript(xpraPath + '/www/js/MediaSourceUtil.js'),
+            $.getScript(xpraPath + '/www/js/Window.js'),
+            $.getScript(xpraPath + '/www/js/Protocol.js'),
+            $.getScript(xpraPath + '/www/js/Client.js'),
+            // loadScript(xpraUrl + '/www/js/Protocol.js'),
 
             $.Deferred(function (deferred) {
                 $(deferred.resolve);
             })
-        ).done(function () {
+       ).done(function () {
             loadXpra(xpraUrl, xpraPath);
         })
 
     }
 
-    function loadScript(url) {
-        // Adding the script tag to the head as suggested before
-        var head = document.getElementsByTagName('head')[0];
-        var script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = url;
-        head.appendChild(script);
-    }
+    function loadXpra(xpraUrl, xpraPath) {
 
-    var loadXpra = function (xpraUrl, xpraPath) {
+        console.log("!xpraUrl " + xpraUrl);
+
         if (!window.location.getParameter) {
-            window.location.getParameter = function (key) {
+            window.location.getParameter = function(key) {
                 function parseParams() {
                     var params = {},
                         e,
                         a = /\+/g,	// Regex for replacing addition symbol with a space
                         r = /([^&=]+)=?([^&]*)/g,
-                        d = function (s) {
-                            return decodeURIComponent(s.replace(a, " "));
-                        },
+                        d = function (s) { return decodeURIComponent(s.replace(a, " ")); },
                         q = window.location.search.substring(1);
 
                     while (e = r.exec(q))
@@ -376,83 +368,137 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
 
         // disable right click menu:
-        window.oncontextmenu = function (e) {
+        window.oncontextmenu = function(e) {
             //showCustomMenu();
             return false;
         }
 
-        function getparam(name) {
-            return window.location.getParameter(name);
+        function getparam(prop) {
+            var value = window.location.getParameter(prop);
+            if (value === undefined && typeof(Storage) !== undefined) {
+                value = sessionStorage.getItem(prop);
+            }
+            return value;
         }
-
-        function getboolparam(name, default_value) {
-            var v = window.location.getParameter(name);
-            if (v == null) {
+        function getboolparam(prop, default_value) {
+            var v = getparam(prop);
+            if(v===null) {
                 return default_value;
             }
-            return ["true", "on", "1"].indexOf(String(v).toLowerCase()) >= 0;
+            return ["true", "on", "1", "yes", "enabled"].indexOf(String(v).toLowerCase())>=0;
         }
 
         function encodeData(s) {
             return encodeURIComponent(s);
         }
-        $(document).ready(function () {
+
+        $(document).ready(function() {
             // look at url parameters
             var username = getparam("username") || null;
             var password = getparam("password") || null;
-            var sound = getparam("sound") || "true";
-            var audio_codec = getparam("audio_codec") || "opus+mka";
+            var sound = getboolparam("sound") || null;
+            var audio_codec = getparam("audio_codec") || null;
             var encoding = getparam("encoding") || null;
             var action = getparam("action") || "connect";
-            var submit = getparam("submit") || null;
+            var submit = getboolparam("submit", true);
             var server = xpraUrl.substring(7, xpraUrl.indexOf("8080") - 1);
             var port = xpraUrl.substring(xpraUrl.indexOf("8080"));
-            var encryption = getparam("encryption") || null;
+            var encryption = getboolparam("encryption", false);
             var key = getparam("key") || null;
             var keyboard_layout = getparam("keyboard_layout") || null;
             var start = getparam("start");
-            var exit_with_children = getparam("exit_with_children") || "";
-            var exit_with_client = getparam("exit_with_client") || "";
+            var exit_with_children = getboolparam("exit_with_children", false);
+            var exit_with_client = getboolparam("exit_with_client", false);
             var sharing = getboolparam("sharing", false);
             var video = getboolparam("video", false);
             var mediasource_video = getboolparam("mediasource_video", false);
-            var normal_fullscreen = getboolparam("normal_fullscreen", false);
             var remote_logging = getboolparam("remote_logging", true);
-            // var debug = getboolparam("debug", true);
             var debug = getboolparam("debug", false);
             var insecure = getboolparam("insecure", false);
             var ignore_audio_blacklist = getboolparam("ignore_audio_blacklist", false);
             var clipboard = getboolparam("clipboard", true);
+            var printing = getboolparam("printing", true);
+            var file_transfer = getboolparam("file_transfer", true);
+            var steal = getboolparam("steal", true);
+            var reconnect = getboolparam("reconnect", true);
+            var swap_keys = getboolparam("swap_keys", Utilities.isMacOS());
+            //delete session params:
+            console.log("server " + server)
+            console.log("port " + port)
+            try {
+                sessionStorage.clear();
+            }
+            catch (e) {
+                //ignore
+            }
 
-            // console.log("ignore_audio_blacklist");
-            // console.log(ignore_audio_blacklist);
+            // show connection progress:
+            function connection_progress(state, details, progress) {
+                console.log("connection_progress(", state, ", ", details, ", ", progress, ")");
+                if (progress>=100) {
+                    $('#progress').hide();
+                }
+                else {
+                    $('#progress').show();
+                }
+                $('#progress-bar').val(progress);
+                $('#progress-label').text(state || " ");
+                $('#progress-details').text(details || " ");
+            }
+
             // create the client
             var client = new XpraClient('display');
-
             client.debug = debug;
             client.remote_logging = remote_logging;
             client.sharing = sharing;
             client.insecure = insecure;
             client.clipboard_enabled = clipboard;
+            client.printing = printing;
+            client.file_transfer = file_transfer;
+            client.steal = steal;
+            client.reconnect = reconnect;
+            client.swap_keys = swap_keys;
+            client.on_connection_progress = connection_progress;
+            //example overrides:
+            //client.HELLO_TIMEOUT = 3600000;
+            //client.PING_TIMEOUT = 60000;
+            //client.PING_GRACE = 30000;
+            //client.PING_FREQUENCY = 15000;
+
+            if (debug) {
+                //example of client event hooks:
+                client.on_open = function() {
+                    console.debug("connection open");
+                };
+                client.on_connect = function() {
+                    console.debug("connection established");
+                };
+                client.on_first_ui_event = function() {
+                    console.debug("first ui event");
+                };
+                client.on_last_window = function() {
+                    console.debug("last window disappeared");
+                };
+            }
 
             // mediasource video
-            if (video) {
+            if(video) {
                 client.supported_encodings.push("h264");
-                if (mediasource_video) {
+                if(mediasource_video) {
                     client.supported_encodings.push("vp8+webm", "h264+mp4", "mpeg4+mp4");
                 }
             }
-            else if (encoding && (encoding !== "auto")) {
+            else if(encoding && (encoding !== "auto")) {
                 // the primary encoding can be set
                 client.enable_encoding(encoding);
             }
             // encodings can be disabled like so
             // client.disable_encoding("h264");
-            if (action && (action != "connect")) {
+            if(action && (action!="connect")) {
                 sns = {
-                    "mode": action,
+                    "mode" 	: action,
                 };
-                if (start) {
+                if(start) {
                     sns["start"] = [start];
                 }
                 if (exit_with_children) {
@@ -464,91 +510,110 @@ EaasClient.Client = function (api_entrypoint, container) {
                 client.start_new_session = sns
             }
 
-            // see if we should undecorate and maximise normal windows
-            if (normal_fullscreen) {
-                client.normal_fullscreen_mode = true;
-            }
-
             // sound support
-            if (sound) {
+            if(sound) {
                 client.audio_enabled = true;
-                console.log("sound enabled, audio codec string: " + audio_codec);
-                if (audio_codec && audio_codec.indexOf(":") > 0) {
+                console.log("sound enabled, audio codec string: "+audio_codec);
+                if(audio_codec && audio_codec.indexOf(":")>0) {
                     var acparts = audio_codec.split(":");
-
                     client.audio_framework = acparts[0];
                     client.audio_codec = acparts[1];
                 }
                 client.audio_mediasource_enabled = getboolparam("mediasource", true);
                 client.audio_aurora_enabled = getboolparam("aurora", true);
+                client.audio_httpstream_enabled = getboolparam("http-stream", true);
             }
 
-            if (keyboard_layout) {
+            if(keyboard_layout) {
                 client.keyboard_layout = keyboard_layout;
             }
 
             // check for username and password
-            if (username) {
+            if(username) {
                 client.username = username;
             }
-            if (password) {
-                client.authentication_key = password;
+            if(password) {
+                client.password = password;
             }
 
             // check for encryption parameters
-            if (encryption) {
+            if(encryption) {
                 client.encryption = encryption;
-                if (key) {
+                if(key) {
                     client.encryption_key = key;
                 }
             }
 
             // attach a callback for when client closes
-            if (!debug) {
-                client.callback_close = function (reason) {
-                    if (submit) {
+            if(!debug) {
+                client.callback_close = function(reason) {
+                    if(submit) {
                         var message = "Connection closed (socket closed)";
-                        if (reason) {
+                        if(reason) {
                             message = reason;
                         }
-                        var url = "/connect.html?disconnect=" + encodeData(message);
+                        var url = "/connect.html";
+                        function add_prop(prop, value) {
+                            if (typeof(Storage) !== "undefined") {
+                                if (value===null || value==="undefined") {
+                                    sessionStorage.removeItem(prop);
+                                }
+                                else {
+                                    sessionStorage.setItem(prop, value);
+                                }
+                            } else {
+                                if (value===null || value==="undefined") {
+                                    value = "";
+                                }
+                                url = url + "&"+prop+"="+encodeData(""+value);
+                            }
+                        }
+                        add_prop("disconnect", message);
                         var props = {
-                            "username": username,
-                            "password": password,
-                            "encoding": encoding,
-                            "keyboard_layout": keyboard_layout,
-                            "action": action,
-                            "sound": sound,
-                            "audio_codec": audio_codec,
-                            "clipboard": clipboard,
+                            "username"			: username,
+                            "insecure"			: insecure,
+                            "server"			: server,
+                            "port"				: port,
+                            "encoding"			: encoding,
+                            "keyboard_layout"	: keyboard_layout,
+                            "action"			: action,
+                            "sound"				: sound,
+                            "audio_codec"		: audio_codec,
+                            "clipboard"			: clipboard,
                             "exit_with_children": exit_with_children,
-                            "exit_with_client": exit_with_client,
-                            "sharing": sharing,
-                            "normal_fullscreen": normal_fullscreen,
-                            "video": video,
-                            "mediasource_video": mediasource_video,
-                            "debug": debug,
-                            "remote_logging": remote_logging,
-                            "insecure": insecure,
-                            "ignore_audio_blacklist": ignore_audio_blacklist,
+                            "exit_with_client"	: exit_with_client,
+                            "sharing"			: sharing,
+                            "steal"				: steal,
+                            "video"				: video,
+                            "mediasource_video"	: mediasource_video,
+                            "debug"				: debug,
+                            "remote_logging"	: remote_logging,
+                            "ignore_audio_blacklist" : ignore_audio_blacklist,
+                        }
+                        if (insecure || sessionStorage) {
+                            props["password"] = password;
+                        }
+                        else {
+                            props["password"] = "";
                         }
                         for (var name in props) {
                             var value = props[name];
-                            if (value) {
-                                url += "&" + name + "=" + encodeData(value);
-                            }
+                            add_prop(name, value);
                         }
-                        window.location = url;
+                        window.location=url;
                     } else {
                         // if we didn't submit through the form, silently redirect to the connect gui
-                        window.location = "connect.html";
+                        window.location="connect.html";
                     }
                 }
             }
             client.init(ignore_audio_blacklist);
 
-            // and connect
-            var ssl = document.location.protocol == "https:";
+            var ssl = document.location.protocol=="https:";
+            client.host = server;
+            client.port = port;
+            client.ssl = ssl;
+
 
 
             /**
@@ -559,52 +624,33 @@ EaasClient.Client = function (api_entrypoint, container) {
              * @param with_worker
              * @private
              */
-            XpraClient.prototype._do_connect = function (with_worker) {
-                if (with_worker && !(XPRA_CLIENT_FORCE_NO_WORKER)) {
-                    this.protocol = new XpraProtocolWorkerHost();
-                } else {
-                    this.protocol = new XpraProtocol();
-                }
-                // set protocol to deliver packets to our packet router
-                this.protocol.set_packet_handler(this._route_packet, this);
-                // make uri
-                var uri = "ws://";
-                if (this.ssl)
-                    uri = "wss://";
-                uri += this.host;
-                uri += ":" + this.port;
-                // do open
-                this.protocol.open = function (uri) {
-                    var me = this;
-                    this.worker = new Worker(xpraPath + '/js/Protocol.js');
-                    this.worker.addEventListener('message', function (e) {
-                        var data = e.data;
-                        switch (data.c) {
-                            case 'r':
-                                me.worker.postMessage({'c': 'o', 'u': uri});
-                                break;
-                            case 'p':
-                                if (me.packet_handler) {
-                                    me.packet_handler(data.p, me.packet_ctx);
-                                }
-                                break;
-                            case 'l':
-                                console.log(data.t);
-                                break;
-                            default:
-                                console.error("got unknown command from worker");
-                                console.error(e.data);
-                        }
-                        ;
-                    }, false);
-                };
-                this.protocol.open(uri);
-                // wait timeout seconds for a hello, then bomb
+            XpraProtocolWorkerHost.prototype.open = function(uri) {
                 var me = this;
-                this.hello_timer = setTimeout(function () {
-                    me.disconnect_reason = "Did not receive hello before timeout reached, not an Xpra server?";
-                    me.close();
-                }, this.HELLO_TIMEOUT);
+                if (this.worker) {
+                    //re-use the existing worker:
+                    this.worker.postMessage({'c': 'o', 'u': uri});
+                    return;
+                }
+                this.worker = new Worker(xpraPath + '/www/js/Protocol.js');
+                this.worker.addEventListener('message', function(e) {
+                    var data = e.data;
+                    switch (data.c) {
+                        case 'r':
+                            me.worker.postMessage({'c': 'o', 'u': uri});
+                            break;
+                        case 'p':
+                            if(me.packet_handler) {
+                                me.packet_handler(data.p, me.packet_ctx);
+                            }
+                            break;
+                        case 'l':
+                            console.log(data.t);
+                            break;
+                        default:
+                            console.error("got unknown command from worker");
+                            console.error(e.data);
+                    };
+                }, false);
             }
 
             XpraClient.prototype._get_desktop_size = function () {
@@ -618,26 +664,30 @@ EaasClient.Client = function (api_entrypoint, container) {
              * Connect
              * @type {XpraClient.connect}
              */
-            client.connect = XpraClient.prototype.connect = function (host, port, ssl) {
+            XpraClient.prototype.connect = function() {
+                var details = this.host + ":" + this.port;
+                if (this.path) {
+                    details += "/"+this.path;
+                }
+                if (this.ssl) {
+                    details += " with ssl";
+                }
+                this.on_connection_progress("Connecting to server", details, 40);
                 // open the web socket, started it in a worker if available
-                console.log("connecting to xpra server " + host + ":" + port + " with ssl: " + ssl);
-                this.host = host;
-                this.port = port;
-                this.ssl = ssl;
                 // check we have enough information for encryption
-                if (this.encryption) {
-                    if ((!this.encryption_key) || (this.encryption_key == "")) {
+                if(this.encryption) {
+                    if((!this.encryption_key) || (this.encryption_key == "")) {
                         this.callback_close("no key specified for encryption");
                         return;
                     }
                 }
                 // detect websocket in webworker support and degrade gracefully
-                if (window.Worker) {
+                if(window.Worker) {
                     console.log("we have webworker support");
                     // spawn worker that checks for a websocket
                     var me = this;
-                    var worker = new Worker(xpraPath + '/js/lib/wsworker_check.js');
-                    worker.addEventListener('message', function (e) {
+                    var worker = new Worker(xpraPath + '/www/js/lib/wsworker_check.js');
+                    worker.addEventListener('message', function(e) {
                         var data = e.data;
                         switch (data['result']) {
                             case true:
@@ -652,8 +702,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                             default:
                                 console.log("client got unknown message from worker");
                                 me._do_connect(false);
-                        }
-                        ;
+                        };
                     }, false);
                     // ask the worker to check for websocket support, when we receive a reply
                     // through the eventlistener above, _do_connect() will finish the job
@@ -661,8 +710,9 @@ EaasClient.Client = function (api_entrypoint, container) {
                 } else {
                     // no webworker support
                     console.log("no webworker support at all.")
+                    me._do_connect(false);
                 }
-            };
+            }
 
             client._new_window = function (wid, x, y, w, h, metadata, override_redirect, client_properties) {
                 // each window needs their own DIV that contains a canvas
@@ -701,7 +751,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     this._window_set_focus(win);
                 }
 
-                win.undecorate();
+                win._set_decorated(false);
 
                 win.ensure_visible();
 
@@ -715,13 +765,15 @@ EaasClient.Client = function (api_entrypoint, container) {
              * end of the patch
              */
 
-            client.connect(server, port, ssl);
+            // and connect
+            client.connect();
 
+            var pasteboard = $('#pasteboard');
             if (clipboard) {
                 //clipboard hooks:
-                var pasteboard = $('#pasteboard');
                 pasteboard.on('paste', function (e) {
                     var paste_data = (e.originalEvent || e).clipboardData.getData('text/plain');
+                    client._debug("paste event, data=", paste_data);
                     client.send_clipboard_token(unescape(encodeURIComponent(paste_data)));
                     return false;
                 });
@@ -729,6 +781,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     var clipboard_buffer = client.get_clipboard_buffer();
                     $('#pasteboard').text(decodeURIComponent(escape(clipboard_buffer)));
                     $('#pasteboard').select();
+                    client._debug("copy event, clipboard buffer=", clipboard_buffer);
                     client.clipboard_pending = false;
                     return true;
                 });
@@ -736,15 +789,17 @@ EaasClient.Client = function (api_entrypoint, container) {
                     var clipboard_buffer = client.get_clipboard_buffer();
                     $('#pasteboard').text(decodeURIComponent(escape(clipboard_buffer)));
                     $('#pasteboard').select();
+                    client._debug("cut event, clipboard buffer=", clipboard_buffer);
                     client.clipboard_pending = false;
                     return true;
                 });
-                $('#display').on('click', function (e) {
+                $('#screen').on('click', function (e) {
                     //console.log("click pending=", client.clipboard_pending, "buffer=", client.clipboard_buffer);
                     if (client.clipboard_pending) {
                         var clipboard_buffer = client.get_clipboard_buffer();
-                        $('#pasteboard').text(client.clipboard_buffer);
+                        $('#pasteboard').text(clipboard_buffer);
                         $('#pasteboard').select();
+                        client._debug("click event, with pending clipboard buffer=", clipboard_buffer);
                         //for IE:
                         var success = true;
                         if (window.clipboardData && window.clipboardData.setData) {
@@ -760,8 +815,66 @@ EaasClient.Client = function (api_entrypoint, container) {
                     }
                 });
             }
+            //file transfer hooks:
+            if (file_transfer) {
+                function send_file(f) {
+                    console.log("file:", f.name, ", type:", f.type, ", size:", f.size, "last modified:", f.lastModifiedDate ? f.lastModifiedDate.toLocaleDateString() : 'n/a');
+                    var fileReader = new FileReader();
+                    fileReader.onloadend = function (evt) {
+                        var u8a = new Uint8Array(evt.target.result);
+                        var buf = Utilities.Uint8ToString(u8a);
+                        client.send_file(f.name, f.type, f.size, buf);
+                    };
+                    fileReader.readAsArrayBuffer(f);
+                }
+                function handleFileSelect(evt) {
+                    evt.stopPropagation();
+                    evt.preventDefault();
+                    var files = evt.dataTransfer.files;
+                    for (var i = 0, f; f = files[i]; i++) {
+                        send_file(f);
+                    }
+                }
+                function handleDragOver(evt) {
+                    evt.stopPropagation();
+                    evt.preventDefault();
+                    evt.dataTransfer.dropEffect = 'copy';
+                }
+                var screen = document.getElementById('display');
+                screen.addEventListener('dragover', handleDragOver, false);
+                screen.addEventListener('drop', handleFileSelect, false);
+            }
+            //keyboard input for tablets:
+            pasteboard.on("input", function(e) {
+                var txt = pasteboard.val();
+                pasteboard.val("");
+                client._debug("oninput:", txt);
+                if (!client.topwindow) {
+                    return;
+                }
+                for (var i = 0, len = txt.length; i < len; i++) {
+                    var str = txt[i];
+                    var keycode = str.charCodeAt(0);
+                    try {
+                        modifiers = [];
+                        keyval = keycode;
+                        group = 0;
+                        packet = ["key-action", client.topwindow, str, true, modifiers, keyval, str, keycode, group];
+                        client._debug(packet);
+                        client.send(packet);
+                        packet = ["key-action", client.topwindow, str, false, modifiers, keyval, str, keycode, group];
+                        client._debug(packet);
+                        client.send(packet);
+                    }
+                    catch (e) {
+                        client.error("input handling error: "+e);
+                    }
+                }
+            });
         });
-    };
+
+    }
+
 
 
     this.startEnvironmentWithInternet = function (environmentId, kbLanguage,
