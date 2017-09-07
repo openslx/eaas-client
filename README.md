@@ -16,4 +16,4 @@ The user should include following scripts in his HTML/HEAD:
 /target/eaas-client-0.0.3/xpra/www/js/lib/jquery-3.1.1.min.js
 
 ```
-Please note, that jquery version is important. *e.g. Jquery-2.2.2 would produce "Class is undefined" exception.
+Please note, that jquery version is important. *e.g. Jquery-2.2.2 would produce "Class is undefined" exception.*
