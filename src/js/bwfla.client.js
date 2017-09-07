@@ -62,6 +62,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                              */
 
                             if (typeof data.xpra !== "undefined" > -1) {
+                                _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                                 console.log("my link" + data.xpra);
                                 _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
                                 /**
@@ -447,7 +448,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             }
 
             // create the client
-            var client = new XpraClient('display');
+            var client = new XpraClient('emulator-container');
             client.debug = debug;
             client.remote_logging = remote_logging;
             client.sharing = sharing;
@@ -885,7 +886,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 mydiv.id = String(wid);
                 var mycanvas = document.createElement("canvas");
                 mydiv.appendChild(mycanvas);
-                var screen = document.getElementById("display");
+                var screen = document.getElementById("emulator-container");
                 screen.appendChild(mydiv);
                 // set initial sizes
                 mycanvas.width = w;
@@ -1005,7 +1006,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     evt.preventDefault();
                     evt.dataTransfer.dropEffect = 'copy';
                 }
-                var screen = document.getElementById('display');
+                var screen = document.getElementById('emulator-container');
                 screen.addEventListener('dragover', handleDragOver, false);
                 screen.addEventListener('drop', handleFileSelect, false);
             }
