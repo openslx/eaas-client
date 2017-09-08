@@ -61,7 +61,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                              * XPRA Section
                              */
 
-                            if (typeof data.xpra !== "undefined" > -1) {
+                            if (typeof data.xpra !== "undefined") {
                                 _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                                 console.log("my link" + data.xpra);
                                 _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
