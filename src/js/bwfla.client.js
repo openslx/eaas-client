@@ -52,7 +52,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
 
             .then(function (data, status, xhr) {
-                if (!_this.guac) {
+                if (!hasConnected) {
 
                     $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
                         .then(function (data, status, xhr) {
@@ -60,46 +60,44 @@ EaasClient.Client = function (api_entrypoint, container) {
                             /**
                              * XPRA Section
                              */
-
                             if (typeof data.xpra !== "undefined") {
                                 _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
-                                console.log("my link" + data.xpra);
-                                _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
+
                                 /**
                                  * Download dependencies and initialize Xpra session
                                  */
                                 prepareAndLoadXpra(data.xpra);
-
-                                hasConnected = true;
-
-                                for (var i = 0; i < listeners.length; i++) {
-                                    // don't call removed listeners..
-                                    if (listeners[i]) {
-                                        listeners[i]();
-                                    }
-                                }
-
-
                             } else {
                                 /**
                                  * Guacamole Section
                                  */
                                 _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
                                 _this.establishGuacamoleTunnel(data.guacamole);
-                                _this.keepaliveIntervalId = setInterval(_this.keepalive, 1000);
+                            }
 
-                                // call onConnectListeners
-                                hasConnected = true;
+                            _this.pollStateInterval = setInterval(_this.pollState, 1500);
+                            hasConnected = true;
 
-                                for (var i = 0; i < listeners.length; i++) {
-                                    // don't call removed listeners..
-                                    if (listeners[i]) {
-                                        listeners[i]();
-                                    }
+                            for (var i = 0; i < listeners.length; i++) {
+                                // don't call removed listeners..
+                                if (listeners[i]) {
+                                    listeners[i]();
                                 }
                             }
+
                         });
+                } else {
+                    var state = data.state;
+                    if (state == "OK")
+                        _this.keepalive();
+                    else if (state == "INACTIVE") {
+                        location.reload();
+                    } else
+                        _this._onError("Invalid component state: " + state);
                 }
+
+                // _this.pollStateTimeoutId = setTimeout(_this.pollState, 3000);
+
             }, function (xhr) {
                 _this._onError($.parseJSON(xhr.responseText))
             })
@@ -128,8 +126,10 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this._onError = function (msg) {
-        if (this.keepaliveIntervalId)
-            clearInterval(this.keepaliveIntervalId);
+        if (this.pollStateInterval)
+            clearInterval(this.pollStateInterval);
+        // if (this.pollStateIntervalId)
+        //     clearTimeout(this.pollStateTimeoutId);
         if (this.guac)
             this.guac.disconnect();
         if (this.onError) {
@@ -448,7 +448,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             }
 
             // create the client
-            var client = new XpraClient('emulator-container');
+            var client = new XpraClient('display');
             client.debug = debug;
             client.remote_logging = remote_logging;
             client.sharing = sharing;
@@ -886,7 +886,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 mydiv.id = String(wid);
                 var mycanvas = document.createElement("canvas");
                 mydiv.appendChild(mycanvas);
-                var screen = document.getElementById("emulator-container");
+                var screen = document.getElementById("display");
                 screen.appendChild(mydiv);
                 // set initial sizes
                 mycanvas.width = w;
@@ -917,13 +917,15 @@ EaasClient.Client = function (api_entrypoint, container) {
                     this._window_set_focus(win);
                 }
 
-                win._set_decorated(false);
+                // win._set_decorated(false);
 
-                win.ensure_visible();
+                // win.ensure_visible();
 
-                win.fill_screen();
+                // win.fill_screen();
+                win.set_fullscreen(true);
 
-                win.set_maximized(true);
+
+                // win.set_maximized(true);
 
 
             }
@@ -1006,7 +1008,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     evt.preventDefault();
                     evt.dataTransfer.dropEffect = 'copy';
                 }
-                var screen = document.getElementById('emulator-container');
+                var screen = document.getElementById('display');
                 screen.addEventListener('dragover', handleDragOver, false);
                 screen.addEventListener('drop', handleFileSelect, false);
             }
