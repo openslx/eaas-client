@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 Antoine Martin <antoine@devloop.org.uk>
+ * Copyright (c) 2013-2016 Antoine Martin <antoine@devloop.org.uk>
  * Copyright (c) 2014 Joshua Higgins <josh@kxes.net>
  * Copyright (c) 2015-2016 Spikes, Inc.
  * Licensed under MPL 2.0
@@ -37,7 +37,7 @@ function XpraWindow(client, canvas_state, wid, x, y, w, h, metadata, override_re
 	this.offscreen_canvas_mode = null;
 	this._init_2d_canvas();
 	this.paint_queue = [];
-	this.paint_pending = 0;
+	this.paint_pending = false;
 
 	//enclosing div in page DOM
 	this.div = jQuery("#" + String(wid));
@@ -61,9 +61,6 @@ function XpraWindow(client, canvas_state, wid, x, y, w, h, metadata, override_re
 	this.saved_geometry = null;
 	this.maximized = false;
 	this.focused = false;
-	this.decorations = true;
-	this.resizable = false;
-	this.stacking_layer = 0;
 
 	//these values represent the internal geometry
 	//i.e. geometry as windows appear to the compositor
@@ -85,7 +82,6 @@ function XpraWindow(client, canvas_state, wid, x, y, w, h, metadata, override_re
 	this.topoffset = parseInt(jQuery(this.div).css('border-top-width'), 10);
 	this.bottomoffset = parseInt(jQuery(this.div).css('border-bottom-width'), 10);
 
-	this.mousedown_event = null;
 	// Hook up the events we want to receive:
 	jQuery(this.canvas).mousedown(function (e) {
 		me.on_mousedown(e);
@@ -108,65 +104,50 @@ function XpraWindow(client, canvas_state, wid, x, y, w, h, metadata, override_re
 
 	// create the decoration as part of the window, style is in CSS
 	jQuery(this.div).addClass("window");
-	if (this.windowtype) {
-		jQuery(this.div).addClass("window-" + this.windowtype);
-	}
-
-	if (this.client.server_is_desktop) {
-		jQuery(this.div).addClass("desktop");
-		this.resizable = false;
-	}
-	else if(this.override_redirect) {
-		jQuery(this.div).addClass("override-redirect");
-	}
-	else if((this.windowtype == "") || (this.windowtype == "NORMAL") || (this.windowtype == "DIALOG") || (this.windowtype == "UTILITY")) {
-		this.resizable = true;
-		// add a title bar to this window if we need to
-		// create header
-		jQuery(this.div).prepend('<div id="head' + String(wid) + '" class="windowhead"> '+
-				'<span class="windowicon"><img src="../icons/noicon.png" id="windowicon' + String(wid) + '" /></span> '+
-				'<span class="windowtitle" id="title' + String(wid) + '">' + this.title + '</span> '+
-				'<span class="windowbuttons"> '+
-				'<span id="maximize' + String(wid) + '"><img src="../icons/maximize.png" /></span> '+
-				'<span id="close' + String(wid) + '"><img src="../icons/close.png" /></span> '+
-				'</span></div>');
-		// make draggable
-		jQuery(this.div).draggable({ cancel: "canvas" });
-		jQuery(this.div).on("dragstart",function(ev,ui){
-			set_focus_cb(me);
-		});
-		jQuery(this.div).on("dragstop",function(ev,ui){
-			me.handle_moved(ui);
-		});
-		// attach resize handles
-		jQuery(this.div).resizable({ helper: "ui-resizable-helper", "handles": "n, e, s, w, ne, se, sw, nw" });
-		//jQuery(this.div).on("resize",jQuery.debounce(50, function(ev,ui) {
-		//  	me.handle_resized(ui);
-		//}));
-		jQuery(this.div).on("resizestop",function(ev,ui){
-		  	me.handle_resized(ui);
-		});
-		this.d_header = '#head' + String(wid);
-		this.d_closebtn = '#close' + String(wid);
-		this.d_maximizebtn = '#maximize' + String(wid);
-		if (this.resizable) {
-			jQuery(this.d_closebtn).click(function() {
+	jQuery(this.div).addClass("window-" + this.windowtype);
+	// add a title bar to this window if we need to
+	if((this.windowtype == "NORMAL") || (this.windowtype == "DIALOG") || (this.windowtype == "UTILITY")) {
+		if(!this.override_redirect) {
+			// create header
+			jQuery(this.div).prepend('<div id="head' + String(wid) + '" class="windowhead"> '+
+					'<span class="windowicon"><img src="../icons/noicon.png" id="windowicon' + String(wid) + '" /></span> '+
+					'<span class="windowtitle" id="title' + String(wid) + '">' + this.title + '</span> '+
+					'<span class="windowbuttons"> '+
+					'<span id="maximize' + String(wid) + '"><img src="../icons/maximize.png" /></span> '+
+					'<span id="close' + String(wid) + '"><img src="../icons/close.png" /></span> '+
+					'</span></div>');
+			// make draggable
+			jQuery(this.div).draggable({
+				cancel: "canvas",
+				stop: function(e, ui) {
+					me.handle_moved(ui);
+				}
+			});
+			// attach resize handles
+			jQuery(this.div).resizable({
+			  helper: "ui-resizable-helper",
+			  stop: function(e, ui) {
+			  	me.handle_resized(ui);
+			  }
+			});
+			this.d_header = '#head' + String(wid);
+			this.d_closebtn = '#close' + String(wid);
+			this.d_maximizebtn = '#maximize' + String(wid);
+			// adjust top offset
+			this.topoffset = this.topoffset + parseInt(jQuery(this.d_header).css('height'), 10);
+			// assign some interesting callbacks
+			jQuery('#head' + String(wid)).click(function() {
+				set_focus_cb(me);
+			});
+			jQuery('#close' + String(wid)).click(function() {
 				window_closed_cb(me);
 			});
-			jQuery(this.d_maximizebtn).click(function() {
+			jQuery('#maximize' + String(wid)).click(function() {
 				me.toggle_maximized();
 			});
+		} else {
+			jQuery(this.div).addClass("override-redirect");
 		}
-		else {
-			jQuery(this.d_closebtn).hide();
-			jQuery(this.d_maximizebtn).hide();
-		}
-		// adjust top offset
-		this.topoffset = this.topoffset + parseInt(jQuery(this.d_header).css('height'), 10);
-		// assign some interesting callbacks
-		jQuery(this.d_header).click(function() {
-			set_focus_cb(me);
-		});
 	}
 
 	// create the spinner overlay div
@@ -196,12 +177,6 @@ function XpraWindow(client, canvas_state, wid, x, y, w, h, metadata, override_re
 	// now read all metadata
 	this.update_metadata(metadata);
 };
-
-XpraWindow.prototype._debug = function() {
-	if (this.debug) {
-		console.debug.apply(console, arguments);
-	}
-}
 
 XpraWindow.prototype._init_2d_canvas = function() {
 	this.offscreen_canvas_mode = '2d';
@@ -274,10 +249,6 @@ XpraWindow.prototype.updateCanvasGeometry = function() {
 XpraWindow.prototype.updateCSSGeometry = function() {
 	// set size of canvas
 	this.updateCanvasGeometry();
-	if (this.client.server_is_desktop) {
-		jQuery(this.div).position({of : jQuery("#screen")});
-		return;
-	}
 	// work out outer size
 	this.outerH = this.h + this.topoffset + this.bottomoffset;
 	this.outerW = this.w + this.leftoffset + this.rightoffset;
@@ -330,14 +301,8 @@ XpraWindow.prototype.getMouse = function(e) {
 		mbutton = Math.max(0, e.button)+1;
 	//show("getmouse: button="+mbutton+", which="+e.which+", button="+e.button);
 
-	if (this.client.server_is_desktop) {
-		//substract window offset since the desktop's top-left corner should be at 0,0:
-		var pos = jQuery(this.div).position()
-		mx -= pos.left;
-		my -= pos.top;
-	}
-
 	// We return a simple javascript object (a hash) with x and y defined
+    console.log("mx " + mx + "my " + my);
 	return {x: mx, y: my, button: mbutton};
 };
 
@@ -360,11 +325,8 @@ XpraWindow.prototype.on_mousedown = function(e) {
 	// pass the click to the area:
 	var modifiers = [];
 	var buttons = [];
-	this.mousedown_event = e;
-	var me = this;
-	setTimeout(function() {
-		me.handle_mouse_click(mouse.button, true, mx, my, modifiers, buttons);
-	}, 0);
+	this.handle_mouse_click(mouse.button, true, mx, my, modifiers, buttons);
+	return;
 };
 
 XpraWindow.prototype.on_mouseup = function(e) {
@@ -372,13 +334,13 @@ XpraWindow.prototype.on_mouseup = function(e) {
 	var mouse = this.getMouse(e),
 			mx = Math.round(mouse.x),
 			my = Math.round(mouse.y);
-	var modifiers = [];
-	var buttons = [];
-	this.mousedown_event = null;
-	var me = this;
-	setTimeout(function() {
-		me.handle_mouse_click(mouse.button, false, mx, my, modifiers, buttons);
-	}, 0);
+	if (!this.dragging) {
+		var modifiers = [];
+		var buttons = [];
+		this.handle_mouse_click(mouse.button, false, mx, my, modifiers, buttons);
+	}
+
+	this.dragging = false;
 };
 
 XpraWindow.prototype.on_mousescroll = function(e) {
@@ -388,7 +350,9 @@ XpraWindow.prototype.on_mousescroll = function(e) {
 	var modifiers = [];
 	var buttons = [];
 	var wheel = Utilities.normalizeWheel(e);
-	this._debug("normalized wheel event:", wheel);
+	if (this.debug) {
+		console.debug("normalized wheel event:", wheel);
+	}
 	//clamp to prevent event floods:
 	var px = Math.min(1200, wheel.pixelX);
 	var py = Math.min(1200, wheel.pixelY);
@@ -434,44 +398,12 @@ XpraWindow.prototype.toString = function() {
 	return "Window("+this.wid+")";
 };
 
-
-XpraWindow.prototype.update_zindex = function() {
-	var z = 5000 + this.stacking_layer;
-	if (this.override_redirect || this.client.server_is_desktop) {
-		z = 15000;
-	}
-	else if (this.windowtype=="DROPDOWN" || this.windowtype=="TOOLTIP" ||
-			this.windowtype=="POPUP_MENU" || this.windowtype=="MENU" ||
-			this.windowtype=="COMBO") {
-		z = 20000;
-	}
-	else if (this.windowtype=="UTILITY" || this.windowtype=="DIALOG") {
-		z = 15000;
-	}
-	var above = this.metadata["above"];
-	if (above) {
-		z += 5000;
-	}
-	else {
-		var below = this.metadata["below"];
-		if (below) {
-			z -= 5000;
-		}
-	}
-	if (this.focused) {
-		z += 2500;
-	}
-	jQuery(this.div).css('z-index', z);
-}
-
-
 /**
  * Update our metadata cache with new key-values,
  * then call set_metadata with these new key-values.
  */
 XpraWindow.prototype.update_metadata = function(metadata, safe) {
 	//update our metadata cache with new key-values:
-	this._debug("update_metadata(", metadata, ")");
 	for (var attrname in metadata) {
 		this.metadata[attrname] = metadata[attrname];
 	}
@@ -480,7 +412,6 @@ XpraWindow.prototype.update_metadata = function(metadata, safe) {
 	} else {
 		this.set_metadata(metadata)
 	}
-	this.update_zindex();
 };
 
 /**
@@ -494,127 +425,24 @@ XpraWindow.prototype.set_metadata_safe = function(metadata) {
 	if ("window-type" in metadata) {
 		this.windowtype = metadata["window-type"][0];
 	}
-	if ("decorations" in metadata) {
-		this.decorations = metadata["decorations"];
-		this._set_decorated(this.decorations);
-		this.updateCSSGeometry();
-		this.handle_resized();
-		this.apply_size_constraints();
-	}
-	if ("opacity" in metadata) {
-		var opacity = metadata["opacity"];
-		if (opacity<0) {
-			opacity = 1.0;
-		}
-		else {
-			opacity = opacity / 0x100000000
-		}
-		jQuery(this.div).css('opacity', ''+opacity);
-	}
-	//if the attribute is set, add the corresponding css class:
-	var attrs = ["modal", "above", "below"];
-	for (var i = 0; i < attrs.length; i++) {
-		var attr = attrs[i];
-		if (attr in metadata) {
-			var value = metadata[attr];
-			if (value) {
-				jQuery(this.div).addClass(attr);
-			}
-			else {
-				jQuery(this.div).removeClass(attr);
-			}
-		}
-	}
-	if (this.resizable && "size-constraints" in metadata) {
-		this.apply_size_constraints();
-	}
-	if ("class-instance" in metadata) {
-		var wm_class = metadata["class-instance"];
-		var classes = jQuery(this.div).prop("classList");
-		if (classes) {
-			//remove any existing "wmclass-" classes not in the new wm_class list:
-			for (var i = 0; i < classes.length; i++) {
-				var tclass = ""+classes[i];
-				if (tclass.indexOf("wmclass-")===0 && wm_class && wm_class.indexOf(tclass)<0) {
-					jQuery(this.div).removeClass(tclass);
-				}
-			}
-		}
-		if (wm_class) {
-			//add new wm-class:
-			for (var i = 0; i < wm_class.length; i++) {
-				var tclass = wm_class[i].replace(/[^0-9a-zA-Z]/g, '');
-				if (tclass && !jQuery(this.div).hasClass(tclass)) {
-					jQuery(this.div).addClass("wmclass-"+tclass);
-				}
-			}
-		}
-	}
 };
-
-XpraWindow.prototype.apply_size_constraints = function() {
-	var size_constraints = this.metadata["size-constraints"];
-	if (!this.resizable) {
-		return;
-	}
-	if (this.maximized) {
-		jQuery(this.div).draggable('disable');
-	}
-	else {
-		jQuery(this.div).draggable('enable');
-	}
-	var hdec = 0, wdec = 0;
-	if (this.decorations) {
-		//adjust for header
-		hdec = jQuery('#head' + this.wid).outerHeight(true);
-	}
-	var min_size = null, max_size = null;
-	if (size_constraints) {
-		min_size = size_constraints["minimum-size"];
-		max_size = size_constraints["maximum-size"];
-	}
-	var minw=null, minh=null;
-	if (min_size) {
-		minw = min_size[0]+wdec;
-		minh = min_size[1]+hdec;
-	}
-	var maxw=null, maxh=null;
-	if (max_size) {
-		maxw = max_size[0]+wdec;
-		maxh = max_size[1]+hdec;
-	}
-	if(minw>0 && minw==maxw && minh>0 && minh==maxh) {
-		jQuery(this.d_maximizebtn).hide();
-		jQuery(this.div).resizable('disable');
-	} else {
-		jQuery(this.d_maximizebtn).show();
-		if (!this.maximized) {
-			jQuery(this.div).resizable('enable');
-		}
-		else {
-			jQuery(this.div).resizable('disable');
-		}
-	}
-	if (!this.maximized) {
-		jQuery(this.div).resizable("option", "minWidth", minw);
-		jQuery(this.div).resizable("option", "minHeight", minh);
-		jQuery(this.div).resizable("option", "maxWidth", maxw);
-		jQuery(this.div).resizable("option", "maxHeight", maxh);
-	}
-	//TODO: aspectRatio, grid
-}
-
 
 /**
  * Apply new metadata settings.
  */
 XpraWindow.prototype.set_metadata = function(metadata) {
-	this.set_metadata_safe(metadata);
 	if ("fullscreen" in metadata) {
 		this.set_fullscreen(metadata["fullscreen"]==1);
 	}
 	if ("maximized" in metadata) {
 		this.set_maximized(metadata["maximized"]==1);
+	}
+	if ("title" in metadata) {
+		this.title = metadata["title"];
+		jQuery('#title' + this.wid).html(decodeURIComponent(escape(this.title)));
+	}
+	if ("window-type" in metadata) {
+		this.windowtype = metadata["window-type"][0];
 	}
 };
 
@@ -650,61 +478,49 @@ XpraWindow.prototype.restore_geometry = function() {
  * Maximize / unmaximizes the window.
  */
 XpraWindow.prototype.set_maximized = function(maximized) {
+	//show("set_maximized("+maximized+")");
 	if (this.maximized==maximized) {
 		return;
 	}
 	this.max_save_restore(maximized);
 	this.maximized = maximized;
 	this.handle_resized();
-	// this will take care of disabling the "draggable" code:
-	this.apply_size_constraints();
+	// enable or disable the draggable event
+	if(this.maximized) {
+		jQuery(this.div).draggable('disable');
+	} else {
+		jQuery(this.div).draggable('enable');
+	}
 };
 
 /**
  * Toggle maximized state
  */
 XpraWindow.prototype.toggle_maximized = function() {
-	this.set_maximized(!this.maximized);
+	//show("set_maximized("+maximized+")");
+	if (this.maximized==true) {
+		this.set_maximized(false);
+	} else {
+		this.set_maximized(true);
+	}
 };
 
 /**
  * Fullscreen / unfullscreen the window.
  */
 XpraWindow.prototype.set_fullscreen = function(fullscreen) {
+	/*
+	TODO
+	//show("set_fullscreen("+fullscreen+")");
 	if (this.fullscreen==fullscreen) {
 		return;
 	}
-	if (this.resizable) {
-		if (fullscreen) {
-			this._set_decorated(false);
-		}
-		else {
-			this._set_decorated(this.decorations);
-		}
-	}
 	this.max_save_restore(fullscreen);
 	this.fullscreen = fullscreen;
-	this.updateCSSGeometry();
-	this.handle_resized();
+	this.calculate_offsets();
+	this.handle_resize();
+	*/
 };
-
-
-XpraWindow.prototype._set_decorated = function(decorated) {
-	this.topoffset = parseInt(jQuery(this.div).css('border-top-width'), 10);
-	if (decorated) {
-		jQuery('#head' + this.wid).show();
-		jQuery(this.div).removeClass("undecorated");
-		jQuery(this.div).addClass("window");
-		if (this.d_header) {
-			this.topoffset = this.topoffset + parseInt(jQuery(this.d_header).css('height'), 10);
-		}
-	}
-	else {
-		jQuery('#head' + this.wid).hide();
-		jQuery(this.div).removeClass("window");
-		jQuery(this.div).addClass("undecorated");
-	}
-}
 
 /**
  * Either:
@@ -735,6 +551,20 @@ XpraWindow.prototype.fill_screen = function() {
 	this.h = (screen_size[1] - this.topoffset) - this.bottomoffset;
 };
 
+XpraWindow.prototype.undecorate = function() {
+	// hide the window decoration
+	jQuery(this.d_header).hide();
+	// replace window style
+	jQuery(this.div).removeClass("window");
+	jQuery(this.div).addClass("undecorated");
+	// reset the offsets
+	this.leftoffset = parseInt(jQuery(this.div).css('border-left-width'), 10);
+	this.rightoffset = parseInt(jQuery(this.div).css('border-right-width'), 10);
+	this.topoffset = parseInt(jQuery(this.div).css('border-top-width'), 10);
+	this.bottomoffset = parseInt(jQuery(this.div).css('border-bottom-width'), 10);
+	// update geometry
+	this.updateCSSGeometry();
+}
 
 /**
  * We have resized the window, so we need to:
@@ -748,8 +578,6 @@ XpraWindow.prototype.handle_resized = function(e) {
 	// remote resize will call this.resize()
 	// need to update the internal geometry
 	if(e) {
-		this.x = this.x + Math.round(e.position.left - e.originalPosition.left);
-		this.y = this.y + Math.round(e.position.top - e.originalPosition.top);
 		this.w = Math.round(e.size.width) - this.leftoffset - this.rightoffset;
 		this.h = Math.round(e.size.height) - this.topoffset - this.bottomoffset;
 	}
@@ -780,58 +608,12 @@ XpraWindow.prototype.handle_moved = function(e) {
  * if it is fullscreen or maximized.
  */
 XpraWindow.prototype.screen_resized = function() {
-	if (this.client.server_is_desktop) {
-		this.match_screen_size();
-		this.handle_resized();
-	}
 	if (this.fullscreen || this.maximized) {
 		this.fill_screen();
 		this.handle_resized();
 	}
 	this.ensure_visible();
 };
-
-XpraWindow.prototype.match_screen_size = function() {
-	if (this.client.server_screen_sizes.length==0) {
-		return;
-	}
-	//try to find the best screen size to use,
-	//cannot be larger than the browser area
-	var maxw = this.client.desktop_width;
-	var maxh = this.client.desktop_height;
-	var best = 0;
-	var neww = 0, newh = 0;
-	var w = 0, h = 0;
-	var screen_sizes = this.client.server_screen_sizes;
-	var screen_size;
-	for (var i = 0; i < screen_sizes.length; i++) {
-		screen_size = screen_sizes[i];
-		w = screen_size[0];
-		h = screen_size[1];
-		if (w<=maxw && h<=maxh && w*h>best) {
-			best = w*h;
-			neww = w;
-			newh = h;
-		}
-	}
-	if (neww==0 && newh==0) {
-		//not found, try to fine the smallest one:
-		best = 0;
-		for (var i = 0; i < screen_sizes.length; i++) {
-			screen_size = screen_sizes[i];
-			w = screen_size[0];
-			h = screen_size[1];
-			if (best==0 || w*h<best) {
-				best = w*h;
-				neww = w;
-				newh = h;
-			}
-		}
-	}
-	console.log("best screen size:", neww, newh);
-	this.resize(neww, newh);
-};
-
 
 /**
  * Things ported from original shape
@@ -861,33 +643,6 @@ XpraWindow.prototype.resize = function(w, h) {
 	this.move_resize(this.x, this.y, w, h);
 };
 
-XpraWindow.prototype.initiate_moveresize = function(x_root, y_root, direction, button, source_indication) {
-	var dir_str = MOVERESIZE_DIRECTION_STRING[direction];
-	this.log("initiate_moveresize", dir_str, [x_root, y_root, direction, button, source_indication]);
-	if (direction==MOVERESIZE_MOVE) {
-		var e = this.mousedown_event;
-		e.type = "mousedown.draggable";
-		e.target = this.div[0];
-		this.div.trigger(e);
-		//jQuery(this.div).trigger("mousedown");
-	}
-	else if (direction==MOVERESIZE_CANCEL) {
-		jQuery(this.div).draggable('disable');
-		jQuery(this.div).draggable('enable');
-	}
-	else if (direction in MOVERESIZE_DIRECTION_JS_NAME) {
-		var js_dir = MOVERESIZE_DIRECTION_JS_NAME[direction];
-		var resize_widget = jQuery(this.div).find(".ui-resizable-handle.ui-resizable-"+js_dir).first();
-		if (resize_widget) {
-			var pageX = resize_widget.offset().left;
-			var pageY = resize_widget.offset().top;
-			resize_widget.trigger("mouseover");
-			resize_widget.trigger({ type: "mousedown", which: 1, pageX: pageX, pageY: pageY });
-		}
-	}
-}
-
-
 /**
  * Returns the geometry of the window backing image,
  * the inner window geometry (without any borders or top bar).
@@ -908,7 +663,9 @@ XpraWindow.prototype.get_internal_geometry = function() {
  * then we fire "mouse_click_cb" (if it is set).
  */
 XpraWindow.prototype.handle_mouse_click = function(button, pressed, mx, my, modifiers, buttons) {
-	this._debug("got mouse click at ", mx, my);
+	if (this.debug) {
+		console.debug("got mouse click at ", mx, my)
+	}
 	// mouse click event is from canvas just for this window so no need to check
 	// internal geometry anymore
 	this.mouse_click_cb(this, button, pressed, mx, my, modifiers, buttons);
@@ -925,8 +682,6 @@ XpraWindow.prototype.handle_mouse_move = function(mx, my, modifiers, buttons) {
 
 XpraWindow.prototype.update_icon = function(width, height, encoding, img_data) {
 	if (encoding=="png") {
-		//move title to the right:
-		$("#title"+ String(this.wid)).css('left', 32);
 		jQuery('#windowicon' + String(this.wid)).attr('src', "data:image/"+encoding+";base64," + this._arrayBufferToBase64(img_data));
 	}
 };
@@ -936,12 +691,10 @@ XpraWindow.prototype.reset_cursor = function() {
 	jQuery("#"+String(this.wid)).css("cursor", 'default');
 };
 
-XpraWindow.prototype.set_cursor = function(encoding, w, h, xhot, yhot, img_data) {
+XpraWindow.prototype.set_cursor = function(encoding, w, h, img_data) {
 	if (encoding=="png") {
-		var cursor_url = "url('data:image/"+encoding+";base64," + window.btoa(img_data) + "')";
-		jQuery("#"+String(this.wid)).css("cursor", cursor_url+", default");
-		//CSS3 with hotspot:
-		jQuery("#"+String(this.wid)).css("cursor", cursor_url+" "+xhot+" "+yhot+", auto");
+		var cursor_url = "url('data:image/"+encoding+";base64," + window.btoa(img_data) + "'),default";
+		jQuery("#"+String(this.wid)).css("cursor", cursor_url);
 	}
 };
 
@@ -987,7 +740,9 @@ XpraWindow.prototype._init_broadway = function(enc_width, enc_height, width, hei
 	this.log("broadway decoder initialized");
 	this.broadway_paint_location = [0, 0];
 	this.broadway_decoder.onPictureDecoded = function(buffer, p_width, p_height, infos) {
-		this._debug("broadway picture decoded: ", buffer.length, "bytes, size ", p_width, "x", p_height+", paint location: ", me.broadway_paint_location,"with infos=", infos);
+		if(this.debug) {
+			console.debug("broadway picture decoded: ", buffer.length, "bytes, size ", p_width, "x", p_height+", paint location: ", me.broadway_paint_location,"with infos=", infos);
+		}
 		if(!me.broadway_decoder) {
 			return;
 		}
@@ -1009,7 +764,9 @@ XpraWindow.prototype._close_broadway = function() {
 
 
 XpraWindow.prototype._close_video = function() {
-	this._debug("close_video: video_source_buffer=", this.video_source_buffer, ", media_source=", this.media_source, ", video=", this.video);
+	if(this.debug) {
+		console.debug("close_video: video_source_buffer="+this.video_source_buffer+", media_source="+this.media_source+", video="+this.video);
+	}
 	this.video_source_ready = false;
 	if(this.video) {
 		if(this.media_source) {
@@ -1030,7 +787,9 @@ XpraWindow.prototype._close_video = function() {
 }
 
 XpraWindow.prototype._push_video_buffers = function() {
-	this._debug("_push_video_buffers()");
+	if(this.debug) {
+		console.debug("_push_video_buffers()");
+	}
 	var vsb = this.video_source_buffer;
 	var vb = this.video_buffers;
 	if(!vb || !vsb || !this.video_source_ready) {
@@ -1070,7 +829,7 @@ XpraWindow.prototype._init_video = function(width, height, coding, profile, leve
 	this.video.setAttribute('height', height);
 	this.video.style.pointerEvents = "all";
 	this.video.style.position = "absolute";
-	this.video.style.zIndex = this.div.css("z-index")+1;
+	this.video.style.zIndex = "1";
 	this.video.style.left  = ""+this.leftoffset+"px";
 	this.video.style.top = ""+this.topoffset+"px";
 	if(this.debug) {
@@ -1120,7 +879,9 @@ XpraWindow.prototype._init_video = function(width, height, coding, profile, leve
 
 XpraWindow.prototype._non_video_paint = function(coding) {
 	if(this.video && this.video.style.zIndex!="-1") {
-		this._debug("bringing canvas above video for ", coding, " paint event");
+		if(this.debug) {
+			console.debug("bringing canvas above video for "+coding+" paint event");
+		}
 		//push video under the canvas:
 		this.video.style.zIndex = "-1";
 		//copy video to canvas:
@@ -1148,13 +909,13 @@ XpraWindow.prototype.paint = function paint() {
  * if we're not already in the process of painting something.
  */
 XpraWindow.prototype.may_paint_now = function paint() {
-	this._debug("may_paint_now() paint pending=", this.paint_pending, ", paint queue length=", this.paint_queue.length);
-	var now = Utilities.monotonicTime();
-	while ((this.paint_pending==0 || (now-this.paint_pending)>=2000) && this.paint_queue.length>0) {
-		this.paint_pending = now;
+ 	if (this.debug) {
+		console.debug("may_paint_now() paint pending=", this.paint_pending, ", paint queue length=", this.paint_queue.length);
+	}
+	while (!this.paint_pending && this.paint_queue.length>0) {
+		this.paint_pending = true;
 		var item = this.paint_queue.shift();
 		this.do_paint.apply(this, item);
-		now = Utilities.monotonicTime();
 	}
 }
 
@@ -1174,7 +935,9 @@ var DEFAULT_BOX_COLORS = {
         }
 
 XpraWindow.prototype.do_paint = function paint(x, y, width, height, coding, img_data, packet_sequence, rowstride, options, decode_callback) {
-	this._debug("do_paint(", img_data.length, " bytes of ", ("zlib" in options?"zlib ":""), coding, " data ", width, "x", height, " at ", x, ",", y, ") focused=", this.focused);
+ 	if (this.debug) {
+ 		console.debug("do_paint("+img_data.length+" bytes of "+("zlib" in options?"zlib ":"")+coding+" data "+width+"x"+height+" at "+x+","+y+") focused="+this.focused);
+ 	}
 	var me = this;
 
 	if(this.offscreen_canvas_mode!='2d') {
@@ -1194,7 +957,7 @@ XpraWindow.prototype.do_paint = function paint(x, y, width, height, coding, img_
 	}
 
 	function painted(skip_box) {
-		me.paint_pending = 0;
+		me.paint_pending = false;
 		decode_callback(me.client);
 		if (me.debug && !skip_box) {
 			var color = DEFAULT_BOX_COLORS[coding] || "white";
@@ -1203,143 +966,123 @@ XpraWindow.prototype.do_paint = function paint(x, y, width, height, coding, img_
 		me.may_paint_now();
 	}
 
-	function paint_error(e) {
-		me.error("error painting", coding, e);
-		me.paint_pending = 0;
-		decode_callback(me.client, ""+e);
-		me.may_paint_now();
+	if (coding=="rgb32") {
+		this._non_video_paint(coding);
+		var img = this.offscreen_canvas_ctx.createImageData(width, height);
+		//show("options="+(options).toSource());
+		if (options!=null && options["zlib"]>0) {
+			//show("decompressing "+img_data.length+" bytes of "+coding+"/zlib");
+			var inflated = new Zlib.Inflate(img_data).decompress();
+			//show("rgb32 data inflated from "+img_data.length+" to "+inflated.length+" bytes");
+			img_data = inflated;
+		} else if (options!=null && options["lz4"]>0) {
+			// in future we need to make sure that we use typed arrays everywhere...
+			if(img_data.subarray) {
+				var d = img_data.subarray(0, 4);
+			} else {
+				var d = img_data.slice(0, 4);
+			}
+			// will always be little endian
+			var length = d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24);
+			// decode the LZ4 block
+			var inflated = new Buffer(length);
+			if(img_data.subarray) {
+				var uncompressedSize = LZ4.decodeBlock(img_data.subarray(4), inflated);
+			} else {
+				var uncompressedSize = LZ4.decodeBlock(img_data.slice(4), inflated);
+			}
+			img_data = inflated.slice(0, uncompressedSize);
+		}
+		// set the imagedata rgb32 method
+		if(img_data.length > img.data.length) {
+			this.error("data size mismatch: wanted",img.data.length,", got",img_data.length, ", stride",rowstride);
+		} else {
+			if (this.debug) {
+				console.debug("got ",img_data.length,"to paint with stride",rowstride);
+			}
+		}
+		img.data.set(img_data);
+		this.offscreen_canvas_ctx.putImageData(img, x, y);
+		painted();
 	}
-
-	try {
-		if (coding=="rgb32") {
-			this._non_video_paint(coding);
-			var img = this.offscreen_canvas_ctx.createImageData(width, height);
-			//show("options="+(options).toSource());
-			if (options!=null && options["zlib"]>0) {
-				//show("decompressing "+img_data.length+" bytes of "+coding+"/zlib");
-				var inflated = new Zlib.Inflate(img_data).decompress();
-				//show("rgb32 data inflated from "+img_data.length+" to "+inflated.length+" bytes");
-				img_data = inflated;
-			} else if (options!=null && options["lz4"]>0) {
-				// in future we need to make sure that we use typed arrays everywhere...
-				if(img_data.subarray) {
-					var d = img_data.subarray(0, 4);
-				} else {
-					var d = img_data.slice(0, 4);
-				}
-				// will always be little endian
-				var length = d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24);
-				// decode the LZ4 block
-				var inflated = new Buffer(length);
-				if(img_data.subarray) {
-					var uncompressedSize = LZ4.decodeBlock(img_data.subarray(4), inflated);
-				} else {
-					var uncompressedSize = LZ4.decodeBlock(img_data.slice(4), inflated);
-				}
-				img_data = inflated.slice(0, uncompressedSize);
-			}
-			// set the imagedata rgb32 method
-			if(img_data.length > img.data.length) {
-				paint_error("data size mismatch: wanted "+img.data.length+", got "+img_data.length+", stride="+rowstride);
-			}
-			else {
-				this._debug("got ", img_data.length, "to paint with stride", rowstride);
-				img.data.set(img_data);
-				this.offscreen_canvas_ctx.putImageData(img, x, y);
-				painted();
-			}
-		}
-		else if (coding=="jpeg" || coding=="png") {
-			this._non_video_paint(coding);
-			var img = this.offscreen_canvas_ctx.createImageData(width, height);
-			var j = new Image();
-			j.onload = function () {
-				if (j.width==0 || j.height==0) {
-					paint_error("invalid image size: "+j.width+"x"+j.height);
-				}
-				else {
-					me.offscreen_canvas_ctx.drawImage(j, x, y);
-					painted();
-				}
-			};
-			j.onerror = function () {
-				paint_error("failed to load into image tag");
-			}
-			j.src = "data:image/"+coding+";base64," + this._arrayBufferToBase64(img_data);
-		}
-		else if (coding=="h264") {
-			var frame = options["frame"] || -1;
-			if(frame==0) {
-				this._close_broadway();
-			}
-			if(!this.broadway_decoder) {
-				this._init_broadway(enc_width, enc_height, width, height);
-			}
-			this.broadway_paint_location = [x, y];
-			// we can pass a buffer full of NALs to decode() directly
-			// as long as they are framed properly with the NAL header
-			if (!Array.isArray(img_data)) {
-				img_data = Array.from(img_data);
-			}
-			this.broadway_decoder.decode(img_data);
-			// broadway decoding is synchronous:
-			// (and already painted via the onPictureDecoded callback)
+	else if (coding=="jpeg" || coding=="png") {
+		this._non_video_paint(coding);
+		var img = this.offscreen_canvas_ctx.createImageData(width, height);
+		var j = new Image();
+		j.onload = function () {
+			me.offscreen_canvas_ctx.drawImage(j, x, y);
 			painted();
+		};
+		j.src = "data:image/"+coding+";base64," + this._arrayBufferToBase64(img_data);
+	}
+	else if (coding=="h264") {
+		var frame = options["frame"] || -1;
+		if(frame==0) {
+			this._close_broadway();
 		}
-		else if (coding=="h264+mp4" || coding=="vp8+webm" || coding=="mpeg4+mp4") {
-			var frame = options["frame"] || -1;
-			if(frame==0) {
-				this._close_video();
-			}
-			if(!this.video) {
-				var profile = options["profile"] || "baseline";
-				var level  = options["level"] || "3.0";
-				this._init_video(width, height, coding, profile, level);
-			}
-			else {
-				//keep it above the div:
-				this.video.style.zIndex = this.div.css("z-index")+1;
-			}
-			if(img_data.length>0) {
-				this._debug("video state=", MediaSourceConstants.READY_STATE[this.video.readyState], ", network state=", MediaSourceConstants.NETWORK_STATE[this.video.networkState]);
-				this._debug("video paused=", this.video.paused, ", video buffers=", this.video_buffers.length);
-				this.video_buffers.push(img_data);
-				if(this.video.paused) {
-					this.video.play();
-				}
-				this._push_video_buffers();
-				//try to throttle input:
-				var delay = Math.max(10, 50*(this.video_buffers.length-25));
-				var me = this;
-				setTimeout(function() {
-					painted();
-				}, delay);
-				//this._debug("video queue: ", this.video_buffers.length);
-			}
+		if(!this.broadway_decoder) {
+			this._init_broadway(enc_width, enc_height, width, height);
 		}
-		else if (coding=="scroll") {
-			this._non_video_paint(coding);
-			for(var i=0,j=img_data.length;i<j;++i) {
-				var scroll_data = img_data[i];
-				var sx = scroll_data[0],
-					sy = scroll_data[1],
-					sw = scroll_data[2],
-					sh = scroll_data[3],
-					xdelta = scroll_data[4],
-					ydelta = scroll_data[5];
-				this.offscreen_canvas_ctx.drawImage(this.offscreen_canvas, sx, sy, sw, sh, sx+xdelta, sy+ydelta, sw, sh);
-				if (this.debug) {
-					paint_box("brown", sx+xdelta, sy+ydelta, sw, sh);
-				}
-			}
-			painted(true);
+		this.broadway_paint_location = [x, y];
+		// we can pass a buffer full of NALs to decode() directly
+		// as long as they are framed properly with the NAL header
+		this.broadway_decoder.decode(new Uint8Array(img_data));
+		// broadway decoding is synchronous:
+		// (and already painted via the onPictureDecoded callback)
+		painted();
+	}
+	else if (coding=="h264+mp4" || coding=="vp8+webm" || coding=="mpeg4+mp4") {
+		var frame = options["frame"] || -1;
+		if(frame==0) {
+			this._close_video();
 		}
-		else {
-			paint_error("unsupported encoding");
+		if(!this.video) {
+			var profile = options["profile"] || "baseline";
+			var level  = options["level"] || "3.0";
+			this._init_video(width, height, coding, profile, level);
+		}
+		else if (this.video.style.zIndex != "1"){
+			//make sure video is on the top layer:
+			this.video.style.zIndex = "1";
+		}
+		if(img_data.length>0) {
+			if(this.debug) {
+				console.debug("video state="+MediaSourceConstants.READY_STATE[this.video.readyState]+", network state="+MediaSourceConstants.NETWORK_STATE[this.video.networkState]);
+				console.debug("video paused="+this.video.paused+", video buffers="+this.video_buffers.length);
+			}
+			this.video_buffers.push(img_data);
+			if(this.video.paused) {
+				this.video.play();
+			}
+			this._push_video_buffers();
+			//try to throttle input:
+			var delay = Math.max(10, 50*(this.video_buffers.length-25));
+			var me = this;
+			setTimeout(function() {
+				painted();
+			}, delay);
+			//console.debug("video queue: ", this.video_buffers.length);
 		}
 	}
-	catch (e) {
-		paint_error(e);
+	else if (coding=="scroll") {
+		this._non_video_paint(coding);
+		for(var i=0,j=img_data.length;i<j;++i) {
+			var scroll_data = img_data[i];
+			var sx = scroll_data[0],
+				sy = scroll_data[1],
+				sw = scroll_data[2],
+				sh = scroll_data[3],
+				xdelta = scroll_data[4],
+				ydelta = scroll_data[5];
+			this.offscreen_canvas_ctx.drawImage(this.offscreen_canvas, sx, sy, sw, sh, sx+xdelta, sy+ydelta, sw, sh);
+			if (this.debug) {
+				paint_box("brown", sx+xdelta, sy+ydelta, sw, sh);
+			}
+		}
+		painted(true);
+	}
+	else {
+		throw "unsupported coding " + coding;
 	}
 };
 
