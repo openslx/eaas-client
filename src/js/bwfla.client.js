@@ -281,6 +281,15 @@ EaasClient.Client = function (api_entrypoint, container) {
         this.clearTimer();
     };
 
+    this.sendCtrlAltDel = function() {
+      this.guac.sendKeyEvent(1, 0xFFE9);
+      this.guac.sendKeyEvent(1, 0xFFE3);
+      this.guac.sendKeyEvent(1, 0xFFFF);
+      this.guac.sendKeyEvent(0, 0xFFE9);
+      this.guac.sendKeyEvent(0, 0xFFE3);
+      this.guac.sendKeyEvent(0, 0xFFFF);
+   };
+
     this.changeMedia = function (postObj, onChangeDone) {
         $.ajax({
             type: "POST",
