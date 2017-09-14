@@ -264,7 +264,9 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     this.stopEnvironment = function () {
         if (typeof this.guac !== "undefined")
-            this.guac.disconnect();
+            this.guac.disconnect()
+        if (this.pollStateInterval)
+            clearInterval(this.pollStateInterval);
         $.ajax({
             type: "GET",
             url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
