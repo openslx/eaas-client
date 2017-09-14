@@ -123,8 +123,8 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this._onError = function (msg) {
-        if (this.keepaliveIntervalId)
-            clearInterval(this.keepaliveIntervalId);
+        if (this.pollStateInterval)
+            clearInterval(this.pollStateInterval);
         if (this.guac)
             this.guac.disconnect();
         if (this.onError) {
@@ -263,7 +263,8 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.stopEnvironment = function () {
-        this.guac.disconnect();
+        if (typeof this.guac !== "undefined")
+            this.guac.disconnect();
         $.ajax({
             type: "GET",
             url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
@@ -498,48 +499,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                 }
             }
 
-            // attach a callback for when client closes
-            if (!debug) {
-                client.callback_close = function (reason) {
-                    if (submit) {
-                        var message = "Connection closed (socket closed)";
-                        if (reason) {
-                            message = reason;
-                        }
-                        var url = "/connect.html?disconnect=" + encodeData(message);
-                        var props = {
-                            "username": username,
-                            "password": password,
-                            "encoding": encoding,
-                            "keyboard_layout": keyboard_layout,
-                            "action": action,
-                            "sound": sound,
-                            "audio_codec": audio_codec,
-                            "clipboard": clipboard,
-                            "exit_with_children": exit_with_children,
-                            "exit_with_client": exit_with_client,
-                            "sharing": sharing,
-                            "normal_fullscreen": normal_fullscreen,
-                            "video": video,
-                            "mediasource_video": mediasource_video,
-                            "debug": debug,
-                            "remote_logging": remote_logging,
-                            "insecure": insecure,
-                            "ignore_audio_blacklist": ignore_audio_blacklist,
-                        }
-                        for (var name in props) {
-                            var value = props[name];
-                            if (value) {
-                                url += "&" + name + "=" + encodeData(value);
-                            }
-                        }
-                        window.location = url;
-                    } else {
-                        // if we didn't submit through the form, silently redirect to the connect gui
-                        window.location = "connect.html";
-                    }
-                }
-            }
             client.init(ignore_audio_blacklist);
 
             // and connect
