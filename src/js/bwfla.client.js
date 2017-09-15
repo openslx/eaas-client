@@ -43,6 +43,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             var item = part.split("=");
             result[item[0]] = decodeURIComponent(item[1]);
         });
+        return result;
     }
 
 
