@@ -360,7 +360,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         if (!window.location.getParameter) {
             window.location.getParameter = function (key) {
                 function parseParams() {
-                    var params = {},
+                    var params1 = {},
                         e,
                         a = /\+/g,	// Regex for replacing addition symbol with a space
                         r = /([^&=]+)=?([^&]*)/g,
@@ -370,9 +370,9 @@ EaasClient.Client = function (api_entrypoint, container) {
                         q = window.location.search.substring(1);
 
                     while (e = r.exec(q))
-                        params[d(e[1])] = d(e[2]);
+                        params1[d(e[1])] = d(e[2]);
 
-                    return params;
+                    return params1;
                 }
 
                 if (!this.queryStringParams)
