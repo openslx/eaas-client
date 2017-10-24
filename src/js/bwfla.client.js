@@ -6,6 +6,13 @@ var EaasClient = EaasClient || {};
 
 EaasClient.Client = function (api_entrypoint, container) {
 
+    // Clean up on window close
+    window.onbeforeunload = function () {
+        this.disconnect();
+        this.release();
+    }.bind(this);
+
+
     xpraShapes = {
         xpraWidth: 1024,
         xpraHeight: 768,
@@ -100,10 +107,6 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.establishGuacamoleTunnel = function (controlUrl) {
-        window.onbeforeunload = function () {
-            this.guac.disconnect();
-        }.bind(this);
-
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX, y = window.scrollY;
             this.focus();
@@ -280,6 +283,42 @@ EaasClient.Client = function (api_entrypoint, container) {
         console.log("Viewer disconnected successfully.")
         deferred.resolve();
         
+        return deferred.promise();
+    };
+
+    // Checkpoints a running session
+    this.checkpoint = function () {
+        var deferred = $.Deferred();
+
+        if (!this.isStarted) {
+            _this._onFatalError("Environment was not started properly!");
+            deferred.reject();
+            return deferred.promise();
+        }
+
+        console.log("Checkpointing session...");
+        $.ajax({
+            type: "POST",
+            url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
+            timeout: 30000
+        })
+            .done(function (data, status, xhr) {
+                var envid = data.environment_id;
+                console.log("Checkpoint created: " + envid);
+                deferred.resolve(envid);
+            })
+            .fail(function (xhr, status, error) {
+                var json = $.parseJSON(xhr.responseText);
+                if (json.message !== null)
+                    console.error("Server-Error:" + json.message);
+
+                if (error !== null)
+                    console.error("Ajax-Error: " + error);
+
+                console.error("Checkpointing failed!");
+                deferred.reject();
+            });
+
         return deferred.promise();
     };
 
