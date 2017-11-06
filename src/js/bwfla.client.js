@@ -6,6 +6,13 @@ var EaasClient = EaasClient || {};
 
 EaasClient.Client = function (api_entrypoint, container) {
 
+    // Clean up on window close
+    window.onbeforeunload = function () {
+        this.disconnect();
+        this.release();
+    }.bind(this);
+
+
     xpraShapes = {
         xpraWidth: 1024,
         xpraHeight: 768,
@@ -26,7 +33,9 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.componentId = null;
     this.networkId = null;
     this.driveId = null;
-    this.params = null;
+
+    // ID for registered this.pollState() with setInterval()
+    this.pollStateIntervalId = null;
 
     function formatStr(format) {
         var args = Array.prototype.slice.call(arguments, 1);
@@ -47,92 +56,34 @@ EaasClient.Client = function (api_entrypoint, container) {
     }
 
 
-    var hasConnected = false;
-    this.pollState = function (componentId) {
+    var isStarted = false;
+    this.pollState = function () {
         $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
-
             .then(function (data, status, xhr) {
-                if (!hasConnected) {
-
-                    $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
-                        .then(function (data, status, xhr) {
-
-                            /**
-                             * XPRA Section
-                             */
-                            if (typeof data.xpra !== "undefined") {
-                                _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
-
-                                /**
-                                 * Download dependencies and initialize Xpra session
-                                 */
-                                prepareAndLoadXpra(data.xpra);
-                            } else {
-                                /**
-                                 * Guacamole Section
-                                 */
-                                _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
-                                _this.establishGuacamoleTunnel(data.guacamole);
-                            }
-
-                            _this.pollStateInterval = setInterval(_this.pollState, 1500);
-                            hasConnected = true;
-
-                            for (var i = 0; i < listeners.length; i++) {
-                                // don't call removed listeners..
-                                if (listeners[i]) {
-                                    listeners[i]();
-                                }
-                            }
-
-                        });
-                } else {
                     var state = data.state;
                     if (state == "OK")
                         _this.keepalive();
                     else if (state == "INACTIVE") {
                         location.reload();
                     } else
-                        _this._onError("Invalid component state: " + state);
+                        _this._onFatalError("Invalid component state: " + state);
                 }
-
             }).fail(function() {
-                _this._onError("connection failed");
+                _this._onFatalError("connection failed")
             });
     };
 
-    var listeners = [];
-    this.addOnConnectListener = function (callback) {
-        // immediately execute callback when already connected
-        console.log("hasConnected, after" + hasConnected);
-        if (hasConnected) {
-            callback();
-            return {
-                remove: function () {
-                }
-            }
-        }
+    this._onFatalError = function (msg) {
+        if (this.pollStateIntervalId)
+            clearInterval(this.pollStateIntervalId);
 
-        var index = listeners.push(callback) - 1;
+        this.disconnect();
 
-        // can be used to remove the listener
-        return {
-            remove: function () {
-                delete listeners[index];
-            }
-        };
-    };
-
-    this._onError = function (msg) {
-        if (this.pollStateInterval)
-            clearInterval(this.pollStateInterval);
-	if (this.keepaliveIntervalId)
-	    clearInterval(this.keepaliveIntervalId);
-        if (this.guac)
-            this.guac.disconnect();
         if (this.onError) {
             this.onError(msg || {"error": "No error message specified"});
         }
+
+        console.error(msg);
     };
 
     this._onResize = function (width, height) {
@@ -156,16 +107,18 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.establishGuacamoleTunnel = function (controlUrl) {
-        window.onbeforeunload = function () {
-            this.guac.disconnect();
-        }.bind(this);
-
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX, y = window.scrollY;
             this.focus();
             window.scrollTo(x, y);
             return this;
         };
+
+        // Remove old diplay element, if present
+        if (this.guac) {
+            var element = this.guac.getDisplay().getElement();
+            $(element).remove();
+        }
 
         this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
         var displayElement = this.guac.getDisplay().getElement();
@@ -243,6 +196,9 @@ EaasClient.Client = function (api_entrypoint, container) {
 	    data.userContext = args.userContext;
         }
 
+        var deferred = $.Deferred();
+
+        console.log("Starting environment " + environmentId + "...");
         $.ajax({
             type: "POST",
             url: API_URL + "/components",
@@ -250,12 +206,121 @@ EaasClient.Client = function (api_entrypoint, container) {
             contentType: "application/json"
         })
             .then(function (data, status, xhr) {
+                console.log("Environment " + environmentId + " started.");
                 _this.componentId = data.id;
                 _this.driveId = data.driveId;
-                _this.pollState();
-            }, function (xhr) {
-                _this._onError($.parseJSON(xhr.responseText))
+                _this.isStarted = true;
+                _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                deferred.resolve();
+            },
+            function (xhr) {
+                _this._onFatalError($.parseJSON(xhr.responseText));
+                deferred.reject();
             });
+
+        return deferred.promise();
+    };
+
+    // Connects viewer to a running session
+    this.connect = function () {
+        var deferred = $.Deferred();
+
+        if (!this.isStarted) {
+            _this._onFatalError("Environment was not started properly!");
+            deferred.reject();
+            return deferred.promise();
+        }
+
+        console.log("Connecting viewer...");
+        $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
+            .done(function (data, status, xhr) {
+                var connectViewerFunc;
+                var controlUrl;
+
+                // Guacamole connector?
+                if (typeof data.guacamole !== "undefined") {
+                    controlUrl = data.guacamole;
+                    connectViewerFunc = _this.establishGuacamoleTunnel;
+                }
+                // XPRA connector
+                else if (typeof data.xpra !== "undefined") {
+                    controlUrl = data.xpra;
+                    connectViewerFunc = _this.prepareAndLoadXpra;
+                }
+                else {
+                    console.error("Unsupported connector type: " + data);
+                    deferred.reject();
+                    return;
+                }
+
+                // Establish the connection
+                connectViewerFunc.call(_this, controlUrl);
+                console.log("Viewer connected successfully.")
+                deferred.resolve();
+            })
+            .fail(function (xhr) {
+                console.error("Connecting viewer failed!")
+                _this._onFatalError($.parseJSON(xhr.responseText))
+                deferred.reject();
+            });
+
+        return deferred.promise();
+    };
+
+    // Disconnects viewer from a running session
+    this.disconnect = function () {
+        var deferred = $.Deferred();
+
+        if (!this.isStarted) {
+            _this._onFatalError("Environment was not started properly!");
+            deferred.reject();
+            return deferred.promise();
+        }
+
+        console.log("Disconnecting viewer...");
+        if (this.guac)
+            this.guac.disconnect();
+
+        console.log("Viewer disconnected successfully.")
+        deferred.resolve();
+        
+        return deferred.promise();
+    };
+
+    // Checkpoints a running session
+    this.checkpoint = function () {
+        var deferred = $.Deferred();
+
+        if (!this.isStarted) {
+            _this._onFatalError("Environment was not started properly!");
+            deferred.reject();
+            return deferred.promise();
+        }
+
+        console.log("Checkpointing session...");
+        $.ajax({
+            type: "POST",
+            url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
+            timeout: 30000
+        })
+            .done(function (data, status, xhr) {
+                var envid = data.environment_id;
+                console.log("Checkpoint created: " + envid);
+                deferred.resolve(envid);
+            })
+            .fail(function (xhr, status, error) {
+                var json = $.parseJSON(xhr.responseText);
+                if (json.message !== null)
+                    console.error("Server-Error:" + json.message);
+
+                if (error !== null)
+                    console.error("Ajax-Error: " + error);
+
+                console.error("Checkpointing failed!");
+                deferred.reject();
+            });
+
+        return deferred.promise();
     };
 
     this.getScreenshotUrl = function () {
@@ -269,8 +334,8 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.stopEnvironment = function () {
         if (typeof this.guac !== "undefined")
             this.guac.disconnect()
-        if (this.pollStateInterval)
-            clearInterval(this.pollStateInterval);
+        if (this.pollStateIntervalId)
+            clearInterval(this.pollStateIntervalId);
         $.ajax({
             type: "GET",
             url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
@@ -360,42 +425,41 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     }
 
-    this.startEnvironmentWithInternet = function (environmentId, kbLanguage,
-                                                  kbLayout) {
-        $.ajax({
-            type: "POST",
-            url: API_URL + "/components",
-            data: JSON.stringify({
-                environment: environmentId,
-                keyboardLayout: kbLanguage,
-                keyboardModel: kbLayout
-            }),
-            contentType: "application/json"
-        }).done(
-            function (data) {
-                this.tmpdata = data;
-                $.ajax({
-                    type: "POST",
-                    url: API_URL + "/networks",
-                    data: JSON.stringify({
-                        components: [{
-                            componentId: data.id
-                        }],
-                        hasInternet: true
-                    }),
-                    contentType: "application/json"
-                }).done(
-                    function (data2) {
-                        this.pollState(this.tmpdata.controlUrl.replace(
-                            /([^:])(\/\/+)/g, '$1/'), this.tmpdata.id);
-                    }.bind(this)).fail(function (xhr, textStatus, error) {
-                    this._onError($.parseJSON(xhr.responseText));
-                }.bind(this));
+    // TODO: Check whether this works with current server-side implementation!
+    // this.startEnvironmentWithInternet = function (environmentId, kbLanguage,
+    //                                               kbLayout) {
+    //     $.ajax({
+    //         type: "POST",
+    //         url: API_URL + "/components",
+    //         data: JSON.stringify({
+    //             environment: environmentId,
+    //             keyboardLayout: kbLanguage,
+    //             keyboardModel: kbLayout
+    //         }),
+    //         contentType: "application/json"
+    //     }).done(
+    //         function (data) {
+    //             this.tmpdata = data;
+    //             $.ajax({
+    //                 type: "POST",
+    //                 url: API_URL + "/networks",
+    //                 data: JSON.stringify({
+    //                     components: [{
+    //                         componentId: data.id
+    //                     }],
+    //                     hasInternet: true
+    //                 }),
+    //                 contentType: "application/json"
+    //             }).done(
+    //                 function (data2) {
+    //                     this.pollState(this.tmpdata.controlUrl.replace(
+    //                         /([^:])(\/\/+)/g, '$1/'), this.tmpdata.id);
+    //                 }.bind(this)).fail(function (xhr, textStatus, error) {
+    //                 this._onFatalError($.parseJSON(xhr.responseText));
+    //             }.bind(this));
 
-            }.bind(this)).fail(function (xhr, textStatus, error) {
-            //this._onError($.parseJSON(xhr.responseText).message);
-        }.bind(this));
-    }
-
-
+    //         }.bind(this)).fail(function (xhr, textStatus, error) {
+    //         //this._onFatalError($.parseJSON(xhr.responseText).message);
+    //     }.bind(this));
+    // }
 };
