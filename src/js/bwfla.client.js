@@ -67,7 +67,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                         location.reload();
                     } else
                         _this._onFatalError("Invalid component state: " + state);
-                }
             }).fail(function() {
                 _this._onFatalError("connection failed")
             });
