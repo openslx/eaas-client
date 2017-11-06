@@ -96,9 +96,9 @@ EaasClient.Client = function (api_entrypoint, container) {
                         _this._onError("Invalid component state: " + state);
                 }
 
-            }, function (xhr) {
-                _this._onError($.parseJSON(xhr.responseText))
-            })
+            }).fail(function() {
+                _this._onError("connection failed");
+            });
     };
 
     var listeners = [];
@@ -126,6 +126,8 @@ EaasClient.Client = function (api_entrypoint, container) {
     this._onError = function (msg) {
         if (this.pollStateInterval)
             clearInterval(this.pollStateInterval);
+	if (this.keepaliveIntervalId)
+	    clearInterval(this.keepaliveIntervalId);
         if (this.guac)
             this.guac.disconnect();
         if (this.onError) {
@@ -238,6 +240,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
+	    data.userContext = args.userContext;
         }
 
         $.ajax({
@@ -292,7 +295,18 @@ EaasClient.Client = function (api_entrypoint, container) {
       this.guac.sendKeyEvent(0, 0xFFE9);
       this.guac.sendKeyEvent(0, 0xFFE3);
       this.guac.sendKeyEvent(0, 0xFFFF);
-   };
+    };
+
+    this.snapshot = function (postObj, onChangeDone) {
+        $.ajax({
+            type: "POST",
+            url: API_URL + formatStr("/components/{0}/snapshot", _this.componentId),
+            data: JSON.stringify(postObj),
+            contentType: "application/json"
+        }).then(function (data, status, xhr) {
+            onChangeDone(data, status);
+        });
+    };
 
     this.changeMedia = function (postObj, onChangeDone) {
         $.ajax({
