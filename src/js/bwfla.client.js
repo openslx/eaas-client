@@ -8,7 +8,6 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     // Clean up on window close
     window.onbeforeunload = function () {
-        this.disconnect();
         this.release();
     }.bind(this);
 
@@ -58,6 +57,8 @@ EaasClient.Client = function (api_entrypoint, container) {
 
 
     var isStarted = false;
+    var isConnected = false;
+
     this.pollState = function () {
         $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
             .then(function (data, status, xhr) {
@@ -246,7 +247,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 // XPRA connector
                 else if (typeof data.xpra !== "undefined") {
                     controlUrl = data.xpra;
-		    _this.params = strParamsToObject(data.xpra.substring(data.guacamole.indexOf("#") + 1));
+		    _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadXpra;
                 }
                 else {
@@ -257,7 +258,8 @@ EaasClient.Client = function (api_entrypoint, container) {
 
                 // Establish the connection
                 connectViewerFunc.call(_this, controlUrl);
-                console.log("Viewer connected successfully.")
+                console.log("Viewer connected successfully.");
+                _this.isConnected = true;
                 deferred.resolve();
             })
             .fail(function (xhr) {
@@ -273,8 +275,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.disconnect = function () {
         var deferred = $.Deferred();
 
-        if (!this.isStarted) {
-            _this._onFatalError("Environment was not started properly!");
+        if (!this.isConnected) {
             deferred.reject();
             return deferred.promise();
         }
@@ -284,8 +285,9 @@ EaasClient.Client = function (api_entrypoint, container) {
             this.guac.disconnect();
 
         console.log("Viewer disconnected successfully.")
+        this.isConnected = false;
         deferred.resolve();
-        
+
         return deferred.promise();
     };
 
@@ -334,8 +336,10 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.stopEnvironment = function () {
-        if (typeof this.guac !== "undefined")
-            this.guac.disconnect()
+
+        if (!this.isStarted)
+            return;
+
         if (this.pollStateIntervalId)
             clearInterval(this.pollStateIntervalId);
         $.ajax({
@@ -343,6 +347,9 @@ EaasClient.Client = function (api_entrypoint, container) {
             url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
             async: false,
         });
+
+        this.isStarted = false;
+
         $(container).empty();
     };
 
@@ -351,6 +358,11 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.release = function () {
+        var result = this.disconnect();
+        while (result.state() === "pending") {
+            continue;  // Wait for completion!
+        }
+
         this.stopEnvironment();
         this.clearTimer();
     };
