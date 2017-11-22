@@ -443,7 +443,6 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     }
 
-    // TODO: Check whether this works with current server-side implementation!
     this.startEnvironmentWithInternet = function (environmentId, args) {
         var data = {};
         data.type = "machine";
@@ -494,6 +493,130 @@ EaasClient.Client = function (api_entrypoint, container) {
                     _this._onFatalError($.parseJSON(xhr.responseText));
                     deferred.reject();
                 });
+        return deferred.promise();
+    }
+
+    // TODO: add Lklsocks support
+    // this.startEnvironmentWithSocks = function (environmentId, args) {
+    //     var request = {};
+    //     request.type = "machine";
+    //     request.environment = environmentId;
+    //
+    //     if (typeof args !== "undefined") {
+    //         request.keyboardLayout = args.keyboardLayout;
+    //         request.keyboardModel = args.keyboardModel;
+    //         request.object = args.object;
+    //
+    //         if (args.object == null) {
+    //             request.software = args.software;
+    //         }
+    //         request.userContext = args.userContext;
+    //     }
+    //
+    //     var data2 = {};
+    //     data2.type = "socks";
+    //
+    //
+    //     var deferred = $.Deferred();
+    //
+    //     console.log("Starting environment " + environmentId + "...");
+    //     $.ajax({
+    //         type: "POST",
+    //         url: API_URL + "/components",
+    //         data: JSON.stringify(request),
+    //         contentType: "application/json"
+    //     }).then(function (machine_response, status1, xhr1) {
+    //             console.log("Environment " + environmentId + " started.");
+    //             $.ajax({
+    //                 type: "POST",
+    //                 url: API_URL + "/components",
+    //                 data: JSON.stringify(data2),
+    //                 contentType: "application/json"
+    //             }).then(function (socks_data, status2, xhr2) {
+    //                     $.ajax({
+    //                         type: "POST",
+    //                         url: API_URL + "/networks",
+    //                         data: JSON.stringify({
+    //                             components: [
+    //                                 {componentId: machine_response.id},
+    //                                 {componentId: socks_data.id}
+    //                            ]
+    //                         }),
+    //                         contentType: "application/json"
+    //                     }).then(function (network_data, status3, xhr3) {
+    //                         _this.componentId = machine_response.id;
+    //                         _this.driveId = machine_response.driveId;
+    //                         _this.networkId = network_data.id;
+    //                         _this.isStarted = true;
+    //                         _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+    //                         deferred.resolve();
+    //                     })
+    //                     })
+    //                 },
+    //                 function (xhr2) {
+    //                     _this._onFatalError($.parseJSON(xhr.responseText));
+    //                     deferred.reject();
+    //                 });
+    //             return deferred.promise();
+    // }
+
+    this.startConnectedEnvironments = function (environmentId1, environmentId2, args) {
+        var data = {};
+        data.type = "machine";
+        data.environment = environmentId1;
+
+        if (typeof args !== "undefined") {
+            data.keyboardLayout = args.keyboardLayout;
+            data.keyboardModel = args.keyboardModel;
+            data.object = args.object;
+
+            if (args.object == null) {
+                data.software = args.software;
+            }
+            data.userContext = args.userContext;
+        }
+        var deferred = $.Deferred();
+
+        console.log("Starting environment " + environmentId1 + "...");
+        $.ajax({
+            type: "POST",
+            url: API_URL + "/components",
+            data: JSON.stringify(data),
+            contentType: "application/json"
+        }).then(function (data1, status1, xhr1) {
+                console.log("Environment " + environmentId1 + " started.");
+                data.environment = environmentId2;
+                $.ajax({
+                    type: "POST",
+                    url: API_URL + "/components",
+                    data: JSON.stringify(data),
+                    contentType: "application/json"
+                }).then(function (data2, status2, xhr2) {
+                    $.ajax({
+                        type: "POST",
+                        url: API_URL + "/networks",
+                        data: JSON.stringify({
+                            components: [
+                                {componentId: data1.id},
+                                {componentId: data2.id}
+                            ],
+                            hasInternet: true
+                        }),
+                        contentType: "application/json"
+                    }).then(function (network_data, status3, xhr3) {
+                        _this.componentId = data1.id;
+                        _this.driveId = data1.driveId;
+                        _this.networkId = network_data.id;
+                        _this.isStarted = true;
+                        _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                        deferred.resolve();
+                    })
+                })
+            },
+            function (xhr2) {
+                _this._onFatalError($.parseJSON(xhr.responseText));
+                deferred.reject();
+            });
         return deferred.promise();
     }
 };
