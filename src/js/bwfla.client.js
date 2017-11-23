@@ -402,7 +402,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         });
     };
 
-    function prepareAndLoadXpra(xpraUrl) {
+    this.prepareAndLoadXpra = function (xpraUrl) {
         /*
          search for xpra path, in order to include it to filePath
          */
