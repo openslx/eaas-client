@@ -12,7 +12,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     }.bind(this);
 
 
-    var xpraShapes = {
+    this.xpraShapes = {
         xpraWidth: 1024,
         xpraHeight: 768,
         xpraDPI: 96
@@ -438,7 +438,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 $(deferred.resolve);
             })
         ).done(function () {
-            loadXpra(xpraUrl, xpraPath);
+            loadXpra(xpraUrl, xpraPath, _this.xpraShapes);
         })
 
     }

@@ -1,4 +1,4 @@
-var loadXpra = function (xpraUrl, xpraPath) {
+var loadXpra = function (xpraUrl, xpraPath, xpraShapes) {
     if (!window.location.getParameter) {
         window.location.getParameter = function (key) {
             function parseParams() {
