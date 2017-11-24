@@ -13,8 +13,8 @@ EaasClient.Client = function (api_entrypoint, container) {
 
 
     this.xpraShapes = {
-        xpraWidth: 1024,
-        xpraHeight: 768,
+        xpraWidth: 640,
+        xpraHeight: 480,
         xpraDPI: 96
     };
 
