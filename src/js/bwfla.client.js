@@ -254,6 +254,12 @@ EaasClient.Client = function (api_entrypoint, container) {
 		    _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadXpra;
                 }
+                // WebEmulator connector
+                else if (typeof data.webemulator !== "undefined") {
+                    controlUrl = encodeURIComponent(JSON.stringify(data));
+		    _this.params = strParamsToObject(data.webemulator.substring(data.webemulator.indexOf("#") + 1));
+                    connectViewerFunc = _this.prepareAndLoadWebEmulator;
+                }
                 else {
                     console.error("Unsupported connector type: " + data);
                     deferred.reject();
@@ -442,6 +448,24 @@ EaasClient.Client = function (api_entrypoint, container) {
         })
 
     }
+
+   this.prepareAndLoadWebEmulator = function (url) {
+        /*
+         search for eaas-client.js path, in order to include it to filePath
+         */
+        var scripts = document.getElementsByTagName("script");
+        for (var prop in scripts) {
+            var searchingAim = "eaas-client.js";
+            if (typeof(scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
+                var eaasClientPath = scripts[prop].src;
+            }
+        }
+        var webemulatorPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "webemulator/";
+        var iframe = document.createElement("iframe");
+        iframe.setAttribute("style", "width: 100%; height: 600px;");
+        iframe.src = webemulatorPath + "#controlurls=" + url;
+        container.appendChild(iframe);
+   };
 
     this.startEnvironmentWithInternet = function (environmentId, args) {
         var data = {};
