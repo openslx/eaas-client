@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8" /><script src="../webemulator.js/"></script>
+<div id="screen">
+<div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
+<canvas style="display: none"></canvas>
+</div>
+<script src="third_party/v86/build/v86_all.js"></script>
+<script>
+new class V86 extends WebEmulator {
+  constructor() {
+    super();
+
+    const v86 = "third_party/v86";
+    this.config = {
+      screen_container: document.getElementById("screen"),
+      bios: {
+          url: `${v86}/bios/seabios.bin`,
+      },
+      vga_bios: {
+          url: `${v86}/bios/vgabios.bin`,
+      },
+      autostart: true,
+      boot_order: 0x312,
+    };
+  }
+
+  start() {
+    this.emulator = new V86Starter(this.config);
+  }
+
+  connectDrive(drive, file, connect) {
+    console.log("adding drive", drive, file);
+    switch (drive.type) {
+      case "DISK":
+        this.config.hdb = {buffer: file, /*url: "."*/}
+      break;
+      case "CDROM":
+        this.config.cdrom = {buffer: file};
+      break;
+    }
+  }
+}
+</script>
