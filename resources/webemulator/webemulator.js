@@ -41,8 +41,6 @@ class WebEmulator {
   addNic() {}
 }
 
-fetch("https://rafaelgieschke.github.io/await.-variables/await.js").then(v=>v.text()).then(eval);
-
 {
 
 /**
