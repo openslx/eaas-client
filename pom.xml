@@ -134,7 +134,7 @@
                             <resources>
                                 <resource>
                                     <directory>${basedir}/resources/webemulator/</directory>
-                                    <filtering>true</filtering>
+                                    <filtering>false</filtering>
                                 </resource>
                             </resources>
                         </configuration>
