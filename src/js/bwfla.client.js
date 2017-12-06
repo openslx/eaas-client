@@ -345,6 +345,15 @@ EaasClient.Client = function (api_entrypoint, container) {
         return API_URL + formatStr("/components/{0}/print", _this.componentId);
     };
 
+    this.getEmulatorState = function () {
+        if (typeof(emulatorState) !== "undefined")
+            return emulatorState;
+        else {
+            console.warn("emulator state is not defined yet!");
+            return "undefined";
+        }
+    };
+
     this.stopEnvironment = function () {
 
         if (!this.isStarted)
