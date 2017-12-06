@@ -59,23 +59,25 @@ EaasClient.Client = function (api_entrypoint, container) {
     var isStarted = false;
     var isConnected = false;
 
+    var emulatorState;
+
     this.pollState = function () {
         $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
             .then(function (data, status, xhr) {
-                    var state = data.state;
-                    if (state == "OK")
-                        _this.keepalive();
-                    else if(state == "STOPPED" || state == "FAILED"){
-                        _this.keepalive();
-                        $("#emulator-container").text("EMULATOR HAS STOPPED!");
-                    }
-                    else if (state == "INACTIVE") {
-                        location.reload();
-                    } else
-                        _this._onFatalError("Invalid component state: " + state);
-            }).fail(function() {
-                _this._onFatalError("connection failed")
-            });
+                emulatorState = data.state;
+                if (emulatorState == "OK")
+                    _this.keepalive();
+                else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
+                    _this.keepalive();
+                    $("#emulator-container").text("EMULATOR HAS STOPPED!");
+                }
+                else if (emulatorState == "INACTIVE") {
+                    location.reload();
+                } else
+                    _this._onFatalError("Invalid component state: " + this.emulatorState);
+            }).fail(function () {
+            _this._onFatalError("connection failed")
+        });
     };
 
     this._onFatalError = function (msg) {
