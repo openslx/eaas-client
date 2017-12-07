@@ -101,7 +101,7 @@
                 <version>3.0.2</version>
                 <executions>
                     <execution>
-                        <id>copy-resources</id>
+                        <id>copy-xpra</id>
                         <phase>validate</phase>
                         <goals>
                             <goal>copy-resources</goal>
@@ -124,7 +124,7 @@
                 <version>3.0.2</version>
                 <executions>
                     <execution>
-                        <id>copy-resources</id>
+                        <id>copy-webemulator</id>
                         <phase>validate</phase>
                         <goals>
                             <goal>copy-resources</goal>
