@@ -13,13 +13,24 @@ new class V86 extends WebEmulator {
     this.config = {
       screen_container: document.getElementById("screen"),
       bios: {
-          url: `${v86}/bios/seabios.bin`,
+          // Use Bochs BIOS as SeaBIOS seems to be broken when using
+          // multiple devices (hard/floppy/CD-ROM drives);
+          // cf. <https://github.com/copy/v86/issues/55>,
+          // <https://bugzilla.redhat.com/show_bug.cgi?id=997817>.
+          url: `${v86}/bios/bochs-bios.bin`,
       },
       vga_bios: {
-          url: `${v86}/bios/vgabios.bin`,
+          url: `${v86}/bios/bochs-vgabios.bin`,
       },
       autostart: true,
+      // boot_order: 0xXYZ (X, Y, Z are hex digits):
+      // Try Z first, then Y, finally X.
+      // X/Y/Z can be: 1 (floppy), 2 (hard disk),
+      // 3 (CD-ROM), 4 (disabled).
+      // Cf. <https://github.com/qemu/seabios/blob/master/src/boot.c#L267>,
+      // <http://bochs.sourceforge.net/cgi-bin/lxr/source/bios/rombios.c#L8257>.
       boot_order: 0x312,
+      fastboot: true,
     };
   }
 
@@ -31,7 +42,7 @@ new class V86 extends WebEmulator {
     console.log("adding drive", drive, file);
     switch (drive.type) {
       case "DISK":
-        this.config.hdb = {buffer: file, /*url: "."*/}
+        this.config.hda = {buffer: file, /*url: "."*/}
       break;
       case "CDROM":
         this.config.cdrom = {buffer: file};
