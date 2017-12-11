@@ -1,3 +1,5 @@
+const wait = t_ms => new Promise(r => setTimeout(r, t_ms));
+
 class WebEmulator {
   constructor() {
     window.emu = this;
@@ -20,7 +22,8 @@ class WebEmulator {
         this.start();
       break;
       case "connectDrive":
-        const file = new WebEmulatorFile({socket, fd: data.fd, size: 500000000}, data.fd);
+	// TODO: Get real size of drive; allow to fake a (minimum) size.
+        const file = new WebEmulatorFile({socket, fd: data.fd, size: 5000000000}, data.fd);
         this.connectDrive(data.drive, file, data.connect);
       break;
       case "addNic":
