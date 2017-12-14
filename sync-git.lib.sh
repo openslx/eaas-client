@@ -39,5 +39,5 @@ Via \`$BASENAME\`.
 
 Commit '$REV'
 of $REPO
-(<${REPO%.git}/commit/$REV>).
+(<${REPOURL}/commit/$REV>).
 EOF
