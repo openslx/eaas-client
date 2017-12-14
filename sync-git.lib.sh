@@ -29,6 +29,9 @@ SHORT="$(git rev-parse --short=10 HEAD)"
 build
 cd "$BASEDIR"
 add
+REPOURL="$REPO"
+REPOURL="${REPOURL%.git}"
+REPOURL="${REPOURL%/}"
 git commit -F - << EOF
 Update $NAME ('$SHORT')
 
