@@ -243,6 +243,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             .done(function (data, status, xhr) {
                 var connectViewerFunc;
                 var controlUrl;
+                // HACK: minify-maven-plugin:1.7.6:minify does not like `import()`.
+                eval('import("./webemulator/webnetwork.js")').then(({start}) => start(data));
 
                 // Guacamole connector?
                 if (typeof data.guacamole !== "undefined") {
