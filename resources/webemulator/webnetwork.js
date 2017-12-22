@@ -1,6 +1,42 @@
 import(import.meta.url).then(v=>window.mod=v);
 
 import "https://rawgit.com/creatorrr/web-streams-polyfill/master/dist/polyfill.min.js";
+import picotcp from "./picotcp.js";
+
+export { picotcp };
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/*
+wait = ms=>{for(const end = performance.now() + ms; performance.now() < end;);}
+setInterval(()=>{console.log(++x);wait(1100*a);console.log("done",x);}, 1000);x=0;a=1
+*/
+
+
+/** @param {Uint8Array} buffer */
+window.SEND = buffer => {
+    /** @type {WebSocket} */ const ws = window.ws;
+    const length = buffer.length;
+    // console.log("SENDING into VM -->", buffer, length);
+    const blob = new Blob([new Uint8Array([length >> 8, length & 0xff]), buffer]);
+    ws.send(blob);
+    return length;
+};
+
+window.POLL = (n, dev, module) => {
+    while (n--) {
+        if (!window.Q.length) break;
+        const buf = window.Q.shift();
+        // TODO: When do we need to free this?
+        const pointer = module._malloc(buf.length);
+        module.writeArrayToMemory(buf, pointer);
+        // console.log("<-- GETTING from VM", new Uint8Array(buf), buf.length, pointer);
+        module.ccall("pico_stack_recv", "number", ["number", "number", "number"],
+            [dev, pointer, buf.length]);
+    }
+    return n;
+};
+window.Q = [];
 
 export const messages = [];
 export async function start(data) {
@@ -10,7 +46,14 @@ export async function start(data) {
     const url = new URL(urls[0][1]);
     const ws = new WebSocket(url);
 
-    ws.onopen = console.log;
+    let stack;
+    ws.onopen = async () => {
+        await sleep(7000);
+        console.log("open ws");
+        stack = picotcp();
+        console.log("opoen,", stack);
+        setInterval(() => stack._pico_stack_tick(), 500);
+    };
     ws.binaryType = "arraybuffer";
     /*ws.onmessage = ev => {
         const buf = new Uint8Array(ev.data);
@@ -18,18 +61,24 @@ export async function start(data) {
         console.log(buf);
     };*/
 
+    window.ws = ws;
     const stream = wrapWebSocket(ws)
         .pipeThrough(new Uint8ArrayStream())
         .pipeThrough(new VDEParser())
-        // VDE does not send a CRC.
+/*        // VDE does not send a CRC.
         .pipeThrough(new EthernetParser({crcLength: 0}))
         // .pipeThrough(new EthernetPrinter())
         .pipeThrough(new IPv4Parser())
         .pipeThrough(new UDPParser())
-        ;
+*/        ;
     const read = stream.getReader();
 
-    for await (const chunk of read) console.log(chunk);
+    for await (const chunk of read) {
+        window.Q.push(chunk);
+        try { stack._pico_stack_tick(); } catch (e) {}
+        // console.log(chunk);
+    }
+
 }
 
 new ReadableStream().getReader().__proto__[Symbol.asyncIterator] = function () {
