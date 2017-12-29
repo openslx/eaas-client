@@ -1,4 +1,4 @@
-var loadXpra = function (xpraUrl, xpraPath) {
+var loadXpra = function (xpraUrl, xpraPath, xpraShapes) {
     if (!window.location.getParameter) {
         window.location.getParameter = function (key) {
             function parseParams() {
@@ -307,7 +307,6 @@ var loadXpra = function (xpraUrl, xpraPath) {
                 this.protocol.send(["map-window", wid, geom.x, geom.y, geom.w, geom.h, this._get_client_properties(win)]);
                 this._window_set_focus(win);
             }
-
             win.undecorate();
 
             win.ensure_visible();
@@ -403,4 +402,59 @@ var loadXpra = function (xpraUrl, xpraPath) {
             });
         }
     });
+    MediaSourceUtil.getMediaSourceAudioCodecs = function(ignore_blacklist) {
+        var media_source_class = MediaSourceUtil.getMediaSourceClass();
+        if(!media_source_class) {
+            Utilities.log("audio forwarding: no media source API support");
+            return [];
+        }
+        //IE is totally useless:
+        if(Utilities.isIE()) {
+            return [];
+        }
+        var codecs_supported = [];
+        for (var codec_option in MediaSourceConstants.CODEC_STRING) {
+            var codec_string = MediaSourceConstants.CODEC_STRING[codec_option];
+            try {
+                if(!media_source_class.isTypeSupported(codec_string)) {
+                    Utilities.log("audio codec MediaSource NOK: '"+codec_option+"' / '"+codec_string+"'");
+                    //add whitelisting here?
+                    continue;
+                }
+                var blacklist = ["wav", "wave", "flac+ogg"];
+                if (Utilities.isFirefox()) {
+                    blacklist += [//"opus+mka",
+                        "vorbis+mka"//,
+                        // "aac+mpeg4",
+                        // "mp3+mpeg4"
+                    ];
+                }
+                else if (Utilities.isSafari()) {
+                    //this crashes Safari!
+                    blacklist += ["aac+mpeg4"];
+                }
+
+                else
+                if (Utilities.isChrome()) {
+                    blacklist += ["aac+mpeg4"];
+                }
+                if(blacklist.indexOf(codec_option)>=0) {
+                    Utilities.log("audio codec MediaSource '"+codec_option+"' / '"+codec_string+"' is blacklisted for "+navigator.userAgent);
+                    if(ignore_blacklist) {
+                        Utilities.log("blacklist overruled!");
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                codecs_supported[codec_option] = codec_string;
+                Utilities.log("audio codec MediaSource OK  '"+codec_option+"' / '"+codec_string+"'");
+            }
+            catch (e) {
+                Utilities.error("audio error probing codec '"+codec_string+"' / '"+codec_string+"': "+e);
+            }
+        }
+        Utilities.log("getMediaSourceAudioCodecs(", ignore_blacklist, ")=", codecs_supported);
+        return codecs_supported;
+    }
 };
