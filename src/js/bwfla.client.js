@@ -68,8 +68,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                     _this.keepalive();
                 else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                     _this.keepalive();
-		    if(this.onEmulatorStopped)
-			this.onEmulatorStopped();
+		    if(_this.onEmulatorStopped)
+			_this.onEmulatorStopped();
                 }
                 else if (emulatorState == "INACTIVE") {
                     location.reload();
