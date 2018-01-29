@@ -4,6 +4,7 @@ import "https://rawgit.com/creatorrr/web-streams-polyfill/master/dist/polyfill.m
 import picotcp from "./picotcp.js";
 
 export { picotcp };
+export let globalStack;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -51,6 +52,7 @@ export async function start(data) {
         await sleep(7000);
         console.log("open ws");
         stack = picotcp();
+        globalStack = stack;
         console.log("opoen,", stack);
         setInterval(() => stack._pico_stack_tick(), 500);
     };
@@ -85,6 +87,69 @@ new ReadableStream().getReader().__proto__[Symbol.asyncIterator] = function () {
     return {
         next: () => this.read(),
     };
+}
+
+class SyncWritableReadableStream extends ReadableStream {
+    constructor(...args) {
+        let controller;
+        super({
+            start: _controller => controller = _controller,
+        }, ...args);
+        this.controller = controller;
+    }
+}
+
+class SyncSink {
+    constructor({size = () => 1, highWaterMark = 1} = {}) {
+        this._queue = [];
+        this._queueTotalSize = 0;
+        this._strategyHWM = highWaterMark;
+        console.log(size);
+        this._strategySizeAlgorithm = size;
+        this._ready = Promise.resolve();
+        this._readyResolve = () => {};
+        this._readyReject = () => {};
+    }
+    write(chunk, controller) {
+        console.log("write");
+        const size = this._strategySizeAlgorithm(chunk);
+        this._queueTotalSize += size;
+        this._queue.push([chunk, size]);
+        if (this._queueTotalSize < this._strategyHWM) return;
+        this._ready = new Promise((resolve, reject) => {
+            this._readyResolve = resolve;
+            this._readyReject = reject;
+        });
+        return this._ready;
+    }
+    read() {
+        if (this._queue.length === 0) return [];
+        const [chunk, size] = this._queue.shift();
+        this._queueTotalSize -= size;
+        if (this._queueTotalSize < 0) this._queueTotalSize = 0;
+        if (this._queueTotalSize < this._strategyHWM) this._readyResolve();
+        return [chunk];
+    }
+}
+
+class SyncReadableWritableStream extends WritableStream {
+    constructor(sinkArgs, ...args) {
+        const sink = new SyncSink(sinkArgs);
+        super(sink, ...args);
+        this._sink = sink;
+    }
+    read() {
+        return this._sink.read()[0];
+    }
+    get ready() {
+        return this._sink._ready;
+    }
+    *[Symbol.iterator]() {
+        for (let v; v = this._sink.read();) {
+            if (v.length === 0) break;
+            yield v[0];
+        }
+    }
 }
 
 export class EthernetPrinter extends TransformStream {
