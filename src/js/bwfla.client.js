@@ -19,11 +19,12 @@ EaasClient.Client = function (api_entrypoint, container) {
         xpraRestrictedEncodings: ["png", "rgb32"]
     };
 
-    this.setXpraShapes = function (width, height, dpi) {
-        xpraShapes = {
+    this.setXpraConf = function (width, height, dpi, RestrictedEncodings) {
+        xpraConf = {
             xpraWidth: width,
             xpraHeight: height,
-            xpraDPI: dpi
+            xpraDPI: dpi,
+            xpraRestrictedEncodings: RestrictedEncodings
         };
     };
 
