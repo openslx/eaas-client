@@ -200,7 +200,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
-            data.userContext = args.userContext;
+            data.userId = args.userId;
         }
 
         var deferred = $.Deferred();
@@ -510,7 +510,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
-            data.userContext = args.userContext;
+            data.userId = args.userId;
         }
 
         var deferred = $.Deferred();
@@ -627,7 +627,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
-            data.userContext = args.userContext;
+            data.userId = args.userId;
         }
         var deferred = $.Deferred();
 
