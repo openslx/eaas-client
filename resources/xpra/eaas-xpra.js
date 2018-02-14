@@ -1,4 +1,4 @@
-var loadXpra = function (xpraUrl, xpraPath, xpraShapes) {
+var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
     if (!window.location.getParameter) {
         window.location.getParameter = function (key) {
             function parseParams() {
@@ -83,7 +83,6 @@ var loadXpra = function (xpraUrl, xpraPath, xpraShapes) {
         client.sharing = sharing;
         client.insecure = insecure;
         client.clipboard_enabled = clipboard;
-
         // mediasource video
         if (video) {
             client.supported_encodings.push("h264");
@@ -91,12 +90,12 @@ var loadXpra = function (xpraUrl, xpraPath, xpraShapes) {
                 client.supported_encodings.push("vp8+webm", "h264+mp4", "mpeg4+mp4");
             }
         }
-        else if (encoding && (encoding !== "auto")) {
-            // the primary encoding can be set
-            client.enable_encoding(encoding);
-        }
+
         // encodings can be disabled like so
-        // client.disable_encoding("h264");
+        for (i = 0; i < xpraConf.xpraRestrictedEncodings.length; i++) {
+            client.disable_encoding(xpraConf.xpraRestrictedEncodings[i]);
+        }
+
         if (action && (action != "connect")) {
             sns = {
                 "mode": action,
@@ -215,11 +214,11 @@ var loadXpra = function (xpraUrl, xpraPath, xpraShapes) {
         }
 
         XpraClient.prototype._get_desktop_size = function () {
-            return [xpraShapes.xpraWidth, xpraShapes.xpraHeight];
+            return [xpraConf.xpraWidth, xpraConf.xpraHeight];
         }
 
         XpraClient.prototype._get_DPI = function () {
-            return xpraShapes.xpraDPI;
+            return xpraConf.xpraDPI;
         }
         /**
          * Connect
