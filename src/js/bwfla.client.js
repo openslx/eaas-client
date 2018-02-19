@@ -203,6 +203,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data.software = args.software;
             }
             data.userId = args.userId;
+	    if(args.lockEnvironment)
+	    	data.lockEnvironment = true;
         }
 
         var deferred = $.Deferred();
@@ -399,6 +401,12 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         this.stopEnvironment();
         this.clearTimer();
+
+        $.ajax({
+            type: "DELETE",
+            url: API_URL + formatStr("/components/{0}", _this.componentId),
+            async: false,
+        });
     };
 
     this.sendCtrlAltDel = function() {
