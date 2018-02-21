@@ -60,7 +60,6 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     var isStarted = false;
     var isConnected = false;
-
     var emulatorState;
 
     this.pollState = function () {
@@ -71,7 +70,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                     _this.keepalive();
                 else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                     _this.keepalive();
-                    $("#emulator-container").text("EMULATOR HAS STOPPED!");
+		    if(_this.onEmulatorStopped)
+			_this.onEmulatorStopped();
                 }
                 else if (emulatorState == "INACTIVE") {
                     location.reload();
@@ -202,7 +202,9 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
-            data.userContext = args.userContext;
+            data.userId = args.userId;
+	    if(args.lockEnvironment)
+	    	data.lockEnvironment = true;
         }
 
         var deferred = $.Deferred();
@@ -345,8 +347,19 @@ EaasClient.Client = function (api_entrypoint, container) {
         return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
     };
 
-    this.getPrintUrl = function () {
-        return API_URL + formatStr("/components/{0}/print", _this.componentId);
+     this.downloadPrint = function (label)
+    {
+        return API_URL + formatStr("/components/{0}/downloadPrintJob?label={1}", _this.componentId, encodeURI(label));
+    }
+
+    this.getPrintJobs = function (successFn, errorFn) {
+        $.get(API_URL + formatStr("/components/{0}/printJobs", _this.componentId))
+        .done(function (data, status, xhr) {
+            successFn(data);
+        }).fail(function (xhr) {
+            if(errorFn)
+                errorFn(xhr);
+        });
     };
 
     this.getEmulatorState = function () {
@@ -388,6 +401,12 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         this.stopEnvironment();
         this.clearTimer();
+
+        $.ajax({
+            type: "DELETE",
+            url: API_URL + formatStr("/components/{0}", _this.componentId),
+            async: false,
+        });
     };
 
     this.sendCtrlAltDel = function() {
@@ -500,7 +519,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
-            data.userContext = args.userContext;
+            data.userId = args.userId;
         }
 
         var deferred = $.Deferred();
@@ -658,7 +677,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (args.object == null) {
                 data.software = args.software;
             }
-            data.userContext = args.userContext;
+            data.userId = args.userId;
         }
         var deferred = $.Deferred();
 
