@@ -442,33 +442,32 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
         var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra/";
 
-        $.when(
-            $.getScript(xpraPath + '/eaas-xpra.js'),
-            $.getScript(xpraPath + '/js/lib/jquery-ui.js'),
-            $.getScript(xpraPath + '/js/lib/jquery.ba-throttle-debounce.js'),
-            $.getScript(xpraPath + '/js/lib/bencode.js'),
-            $.getScript(xpraPath + '/js/lib/zlib.js'),
-            $.getScript(xpraPath + '/js/lib/lz4.js'),
-            $.getScript(xpraPath + '/js/lib/forge.js'),
-            $.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
-            $.getScript(xpraPath + '/js/lib/aurora/aurora-xpra.js'),
-            $.getScript(xpraPath + '/js/Utilities.js'),
-            $.getScript(xpraPath + '/js/Keycodes.js'),
-            $.getScript(xpraPath + '/js/Notifications.js'),
-            $.getScript(xpraPath + '/js/MediaSourceUtil.js'),
-            $.getScript(xpraPath + '/js/Window.js'),
-            $.getScript(xpraPath + '/js/Protocol.js'),
-            $.getScript(xpraPath + '/js/Client.js'),
-            $.getScript(xpraPath + '/js/Client.js'),
+        jQuery.when(
+            jQuery.getScript(xpraPath + '/eaas-xpra.js'),
+            jQuery.getScript(xpraPath + '/js/lib/jquery-ui.js'),
+            jQuery.getScript(xpraPath + '/js/lib/jquery.ba-throttle-debounce.js'),
+            jQuery.getScript(xpraPath + '/js/lib/bencode.js'),
+            jQuery.getScript(xpraPath + '/js/lib/zlib.js'),
+            jQuery.getScript(xpraPath + '/js/lib/forge.js'),
+            jQuery.getScript(xpraPath + '/js/lib/wsworker_check.js'),
+            jQuery.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
+            jQuery.getScript(xpraPath + '/js/lib/aurora/aurora-xpra.js'),
+            jQuery.getScript(xpraPath + '/js/Keycodes.js'),
+            jQuery.getScript(xpraPath + '/js/Utilities.js'),
+            jQuery.getScript(xpraPath + '/js/Notifications.js'),
+            jQuery.getScript(xpraPath + '/js/MediaSourceUtil.js'),
+            jQuery.getScript(xpraPath + '/js/Window.js'),
+            jQuery.getScript(xpraPath + '/js/Protocol.js'),
+            jQuery.getScript(xpraPath + '/js/Client.js'),
 
-            $.Deferred(function (deferred) {
-                $(deferred.resolve);
+            jQuery.Deferred(function (deferred) {
+                jQuery(deferred.resolve);
             })
         ).done(function () {
             loadXpra(xpraUrl, xpraPath, _this.xpraConf);
         })
 
-    }
+    };
 
    this.prepareAndLoadWebEmulator = function (url) {
         /*
@@ -540,6 +539,47 @@ EaasClient.Client = function (api_entrypoint, container) {
                 });
         return deferred.promise();
     }
+
+    this.startDockerEnvironment = function (environmentId, args) {
+        var data = {};
+        data.type = "container";
+        data.environment = environmentId;
+
+        if (typeof args !== "undefined") {
+            data.keyboardLayout = args.keyboardLayout;
+            data.keyboardModel = args.keyboardModel;
+            data.object = args.object;
+
+            if (args.object == null) {
+                data.software = args.software;
+            }
+            data.userContext = args.userContext;
+        }
+
+        var deferred = $.Deferred();
+
+        console.log("Starting environment " + environmentId + "...");
+        $.ajax({
+            type: "POST",
+            url: API_URL + "/components",
+            data: JSON.stringify(data),
+            contentType: "application/json"
+        })
+            .then(function (data, status, xhr) {
+                    console.log("Environment " + environmentId + " started.");
+                    _this.componentId = data.id;
+                    _this.driveId = data.driveId;
+                    _this.isStarted = true;
+                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                    deferred.resolve();
+                },
+                function (xhr) {
+                    _this._onFatalError($.parseJSON(xhr.responseText));
+                    deferred.reject();
+                });
+
+        return deferred.promise();
+    };
 
     // TODO: add Lklsocks support
     // this.startEnvironmentWithSocks = function (environmentId, args) {
