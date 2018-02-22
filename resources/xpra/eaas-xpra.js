@@ -19,7 +19,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var username = getparam("username") || null;
         var password = getparam("password") || null;
         var sound = true;
-        var audio_codec = getparam("audio_codec") || "mediasource:mp3";
+        var audio_codec = getparam("audio_codec") || "http-stream:mp3";
         var encoding = getparam("encoding") || null;
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
@@ -197,7 +197,6 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                     if(reason) {
                         message = reason;
                     }
-                    var url = "/connect.html";
                     function add_prop(prop, value) {
                         if (typeof(Storage) !== "undefined") {
                             if (value===null || value==="undefined") {
@@ -206,11 +205,6 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                             else {
                                 sessionStorage.setItem(prop, value);
                             }
-                        } else {
-                            if (value===null || value==="undefined") {
-                                value = "";
-                            }
-                            url = url + "&"+prop+"="+encodeURIComponent(""+value);
                         }
                     }
                     add_prop("disconnect", message);
@@ -247,10 +241,6 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                         var value = props[name];
                         add_prop(name, value);
                     }
-                    window.location=url;
-                } else {
-                    // if we didn't submit through the form, silently redirect to the connect gui
-                    window.location="connect.html";
                 }
             }
         }
@@ -376,7 +366,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var client = init_client();
 
         /**
-         * PATCH
+         * Client PATCH
          */
 
 
@@ -441,7 +431,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                 url = "https";
             }
             url += "://"+this.host
-                // +":"+this.port
+            // +":"+this.port
             ;
             if (this.path) {
                 url += "/"+this.path;
@@ -466,6 +456,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             x = 0;
             y = 0;
             // create the XpraWindow object to own the new div
+
             var win = new XpraWindow(this, mycanvas, wid, x, y, w, h,
                 metadata,
                 override_redirect,
@@ -596,4 +587,61 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         };
     });
 
+
+    MediaSourceUtil.getMediaSourceAudioCodecs = function(ignore_blacklist) {
+        var media_source_class = MediaSourceUtil.getMediaSourceClass();
+        if(!media_source_class) {
+            Utilities.log("audio forwarding: no media source API support");
+            return [];
+        }
+        //IE is totally useless:
+        if(Utilities.isIE()) {
+            return [];
+        }
+        var codecs_supported = [];
+        for (var codec_option in MediaSourceConstants.CODEC_STRING) {
+            var codec_string = MediaSourceConstants.CODEC_STRING[codec_option];
+            try {
+                // if(!media_source_class.isTypeSupported(codec_string)) {
+                //     Utilities.log("audio codec MediaSource NOK: '"+codec_option+"' / '"+codec_string+"'");
+                //     //add whitelisting here?
+                //     continue;
+                // }
+                var blacklist = ["wav", "wave"];
+                if (Utilities.isFirefox()) {
+                    blacklist += [
+                        // "opus+mka",
+                        // "vorbis+mka",//,
+                        // "aac+mpeg4"
+                         // "mp3+mpeg4"
+                    ];
+                }
+                else if (Utilities.isSafari()) {
+                    //this crashes Safari!
+                    blacklist += ["aac+mpeg4"];
+                }
+
+                else
+                if (Utilities.isChrome()) {
+                    blacklist += ["aac+mpeg4"];
+                }
+                if(blacklist.indexOf(codec_option)>=0) {
+                    Utilities.log("audio codec MediaSource '"+codec_option+"' / '"+codec_string+"' is blacklisted for "+navigator.userAgent);
+                    if(ignore_blacklist) {
+                        Utilities.log("blacklist overruled!");
+                    }
+                    else {
+                        continue;
+                    }
+                }
+                codecs_supported[codec_option] = codec_string;
+                Utilities.log("audio codec MediaSource OK  '"+codec_option+"' / '"+codec_string+"'");
+            }
+            catch (e) {
+                Utilities.error("audio error probing codec '"+codec_string+"' / '"+codec_string+"': "+e);
+            }
+        }
+        Utilities.log("getMediaSourceAudioCodecs(", ignore_blacklist, ")=", codecs_supported);
+        return codecs_supported;
+    }
 };
