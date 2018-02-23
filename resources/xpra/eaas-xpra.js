@@ -19,7 +19,14 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var username = getparam("username") || null;
         var password = getparam("password") || null;
         var sound = true;
-        var audio_codec = getparam("audio_codec") || "http-stream:mp3";
+        if (Utilities.isFirefox()) {
+            var audio_codec = getparam("audio_codec") || "http-stream:mp3";
+        } else if(Utilities.isChrome()){
+            var audio_codec = getparam("audio_codec") || "mediasource:mp3";
+        } else if(Utilities.isSafari()){
+            var audio_codec = getparam("audio_codec") || "legacy:wav";
+        } else
+            var audio_codec = getparam("audio_codec") || null;
         var encoding = getparam("encoding") || null;
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
@@ -541,6 +548,34 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             }, false);
         }
 
+        XpraWindow.prototype.update_zindex = function() {
+            var z = 5000 + this.stacking_layer;
+            if (this.override_redirect || this.client.server_is_desktop) {
+                z = 15000;
+            }
+            else if (this.windowtype=="DROPDOWN" || this.windowtype=="TOOLTIP" ||
+                this.windowtype=="POPUP_MENU" || this.windowtype=="MENU" ||
+                this.windowtype=="COMBO") {
+                z = 20000;
+            }
+            else if (this.windowtype=="UTILITY" || this.windowtype=="DIALOG") {
+                z = 15000;
+            }
+            var above = this.metadata["above"];
+            if (above) {
+                z += 5000;
+            }
+            else {
+                var below = this.metadata["below"];
+                if (below) {
+                    z -= 5000;
+                }
+            }
+            if (this.focused) {
+                z += 2500;
+            }
+            jQuery(this.div).css('z-index', 1000);
+        }
 
         XpraWindow.prototype.getMouse = function(e) {
             var eaas_offset_y = 20; // the size of the top frame (which we deleted for our eaas usecase)
@@ -613,12 +648,17 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                         // "opus+mka",
                         // "vorbis+mka",//,
                         // "aac+mpeg4"
-                         // "mp3+mpeg4"
+                        // "mp3+mpeg4"
                     ];
                 }
                 else if (Utilities.isSafari()) {
                     //this crashes Safari!
-                    blacklist += ["aac+mpeg4"];
+                    blacklist += [
+                        "aac+mpeg4"
+                        // "opus+mka",
+                        // "vorbis+mka",
+                        // "mp3+mpeg4"
+                    ];
                 }
 
                 else
