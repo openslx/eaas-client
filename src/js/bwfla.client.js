@@ -16,15 +16,15 @@ EaasClient.Client = function (api_entrypoint, container) {
         xpraWidth: 640,
         xpraHeight: 480,
         xpraDPI: 96,
-        xpraRestrictedEncodings: ["png", "rgb32"]
+        xpraEncoding: "rgb32"
     };
 
-    this.setXpraConf = function (width, height, dpi, RestrictedEncodings) {
+    this.setXpraConf = function (width, height, dpi, xpraEncoding) {
         xpraConf = {
             xpraWidth: width,
             xpraHeight: height,
             xpraDPI: dpi,
-            xpraRestrictedEncodings: RestrictedEncodings
+            xpraEncoding: xpraEncoding
         };
     };
 
@@ -70,8 +70,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                     _this.keepalive();
                 else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                     _this.keepalive();
-		    if(_this.onEmulatorStopped)
-			_this.onEmulatorStopped();
+                    if(_this.onEmulatorStopped)
+                        _this.onEmulatorStopped();
                 }
                 else if (emulatorState == "INACTIVE") {
                     location.reload();
@@ -123,7 +123,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             return this;
         };
 
-        // Remove old diplay element, if present
+        // Remove old display element, if present
         if (this.guac) {
             var element = this.guac.getDisplay().getElement();
             $(element).remove();
@@ -203,8 +203,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data.software = args.software;
             }
             data.userId = args.userId;
-	    if(args.lockEnvironment)
-	    	data.lockEnvironment = true;
+            if(args.lockEnvironment)
+                data.lockEnvironment = true;
         }
 
         var deferred = $.Deferred();
@@ -217,17 +217,17 @@ EaasClient.Client = function (api_entrypoint, container) {
             contentType: "application/json"
         })
             .then(function (data, status, xhr) {
-                console.log("Environment " + environmentId + " started.");
-                _this.componentId = data.id;
-                _this.driveId = data.driveId;
-                _this.isStarted = true;
-                _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                deferred.resolve();
-            },
-            function (xhr) {
-                _this._onFatalError($.parseJSON(xhr.responseText));
-                deferred.reject();
-            });
+                    console.log("Environment " + environmentId + " started.");
+                    _this.componentId = data.id;
+                    _this.driveId = data.driveId;
+                    _this.isStarted = true;
+                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                    deferred.resolve();
+                },
+                function (xhr) {
+                    _this._onFatalError($.parseJSON(xhr.responseText));
+                    deferred.reject();
+                });
 
         return deferred.promise();
     };
@@ -251,19 +251,19 @@ EaasClient.Client = function (api_entrypoint, container) {
                 // Guacamole connector?
                 if (typeof data.guacamole !== "undefined") {
                     controlUrl = data.guacamole;
-		    _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
+                    _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
                     connectViewerFunc = _this.establishGuacamoleTunnel;
                 }
                 // XPRA connector
                 else if (typeof data.xpra !== "undefined") {
                     controlUrl = data.xpra;
-		    _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
+                    _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadXpra;
                 }
                 // WebEmulator connector
                 else if (typeof data.webemulator !== "undefined") {
                     controlUrl = encodeURIComponent(JSON.stringify(data));
-		    _this.params = strParamsToObject(data.webemulator.substring(data.webemulator.indexOf("#") + 1));
+                    _this.params = strParamsToObject(data.webemulator.substring(data.webemulator.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadWebEmulator;
                 }
                 else {
@@ -347,16 +347,16 @@ EaasClient.Client = function (api_entrypoint, container) {
         return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
     };
 
-     this.downloadPrint = function (label)
+    this.downloadPrint = function (label)
     {
         return API_URL + formatStr("/components/{0}/downloadPrintJob?label={1}", _this.componentId, encodeURI(label));
     }
 
     this.getPrintJobs = function (successFn, errorFn) {
         $.get(API_URL + formatStr("/components/{0}/printJobs", _this.componentId))
-        .done(function (data, status, xhr) {
-            successFn(data);
-        }).fail(function (xhr) {
+            .done(function (data, status, xhr) {
+                successFn(data);
+            }).fail(function (xhr) {
             if(errorFn)
                 errorFn(xhr);
         });
@@ -410,12 +410,12 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.sendCtrlAltDel = function() {
-      this.guac.sendKeyEvent(1, 0xFFE9);
-      this.guac.sendKeyEvent(1, 0xFFE3);
-      this.guac.sendKeyEvent(1, 0xFFFF);
-      this.guac.sendKeyEvent(0, 0xFFE9);
-      this.guac.sendKeyEvent(0, 0xFFE3);
-      this.guac.sendKeyEvent(0, 0xFFFF);
+        this.guac.sendKeyEvent(1, 0xFFE9);
+        this.guac.sendKeyEvent(1, 0xFFE3);
+        this.guac.sendKeyEvent(1, 0xFFFF);
+        this.guac.sendKeyEvent(0, 0xFFE9);
+        this.guac.sendKeyEvent(0, 0xFFE3);
+        this.guac.sendKeyEvent(0, 0xFFFF);
     };
 
     this.snapshot = function (postObj, onChangeDone, errorFn) {
@@ -434,7 +434,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 console.log(textStatus);
                 console.log(error);
             }
-        });  
+        });
     };
 
     this.changeMedia = function (postObj, onChangeDone) {
@@ -488,7 +488,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     };
 
-   this.prepareAndLoadWebEmulator = function (url) {
+    this.prepareAndLoadWebEmulator = function (url) {
         /*
          search for eaas-client.js path, in order to include it to filePath
          */
@@ -504,7 +504,78 @@ EaasClient.Client = function (api_entrypoint, container) {
         iframe.setAttribute("style", "width: 100%; height: 600px;");
         iframe.src = webemulatorPath + "#controlurls=" + url;
         container.appendChild(iframe);
-   };
+    };
+
+
+
+     /* Example of input_data:
+
+        input_data[0] = {
+        type: "HDD",
+        partition_table_type: "MBR",
+        filesystem_type: "FAT32",
+        // filesystem_type: "VFAT",
+        size_mb: 1024,
+        content: [
+            {
+                action: "extract",
+                compression_format: "TAR",
+                url: "http://132.230.4.15/objects/ub/policy.tar",
+                name: "test"
+            }
+        ]
+        };
+
+     * @param environmentId
+     * @param args
+     * @param input_data
+     * @returns {*}
+     */
+    this.startEnvironmentWithAttachment = function (environmentId, args, input_data) {
+        var data = {};
+        data.type = "machine";
+        data.environment = environmentId;
+        data.input_data = input_data;
+
+
+        if (typeof args !== "undefined") {
+            data.keyboardLayout = args.keyboardLayout;
+            data.keyboardModel = args.keyboardModel;
+            data.object = args.object;
+
+            if (args.object == null) {
+                data.software = args.software;
+            }
+            data.userContext = args.userContext;
+        }
+
+        var deferred = $.Deferred();
+
+        console.log("Starting environment " + environmentId + "...");
+        $.ajax({
+            type: "POST",
+            url: API_URL + "/components",
+            data: JSON.stringify(data),
+            contentType: "application/json"
+        })
+            .then(function (data, status, xhr) {
+                    console.log("Environment " + environmentId + " started.");
+                    _this.componentId = data.id;
+                    _this.driveId = data.driveId;
+                    _this.isStarted = true;
+                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                    deferred.resolve();
+                },
+                function (xhr) {
+                    _this._onFatalError($.parseJSON(xhr.responseText));
+                    deferred.reject();
+                });
+
+        this.isAttachmentAvailable = true;
+        return deferred.promise();
+    };
+
+
 
     this.startEnvironmentWithInternet = function (environmentId, args) {
         var data = {};
@@ -723,4 +794,230 @@ EaasClient.Client = function (api_entrypoint, container) {
             });
         return deferred.promise();
     }
+};
+/*
+ *  Example usage:
+ *
+ *      var centerOnScreen = function(width, height) {
+ *          ...
+ *      }
+ *
+ *      var resizeIFrame = function(width, height) {
+ *          ...
+ *      }
+ *
+ *      BWFLA.registerEventCallback(<target-1>, 'resize', centerOnScreen);
+ *      BWFLA.registerEventCallback(<target-2>, 'resize', centerOnScreen);
+ *      BWFLA.registerEventCallback(<target-2>, 'resize', resizeIFrame);
+ */
+
+var BWFLA = BWFLA || {};
+
+// Method to attach a callback to an event
+BWFLA.registerEventCallback = function(target, eventName, callback)
+{
+    var event = 'on' + eventName;
+
+    if (!(event in target)) {
+        console.error('Event ' + eventName + ' not supported!');
+        return;
+    }
+
+    // Add placeholder for event-handlers to target's prototype
+    if (!('__bwFlaEventHandlers__' in target))
+        target.constructor.prototype.__bwFlaEventHandlers__ = {};
+
+    // Initialize the list for event's callbacks
+    if (!(event in target.__bwFlaEventHandlers__))
+        target.__bwFlaEventHandlers__[event] = [];
+
+    // Add the new callback to event's callback-list
+    var callbacks = target.__bwFlaEventHandlers__[event];
+    callbacks.push(callback);
+
+    // If required, initialize handler management function
+    if (target[event] == null) {
+        target[event] = function() {
+            var params = arguments;  // Parameters to the original callback
+
+            // Call all registered callbacks one by one
+            callbacks.forEach(function(func) {
+                func.apply(target, params);
+            });
+        };
+    }
+};
+
+
+// Method to unregister a callback for an event
+BWFLA.unregisterEventCallback = function(target, eventName, callback)
+{
+    // Look in the specified target for the callback and
+    // remove it from the execution chain for this event
+
+    if (!('__bwFlaEventHandlers__' in target))
+        return;
+
+    var callbacks = target.__bwFlaEventHandlers__['on' + eventName];
+    if (callbacks == null)
+        return;
+
+    var index = callbacks.indexOf(callback);
+    if (index > -1)
+        callbacks.splice(index, 1);
+};
+
+/** Custom mouse-event handlers for use with the Guacamole.Mouse */
+var BwflaMouse = function(client)
+{
+    var events = [];
+    var handler = null;
+    var waiting = false;
+
+
+    /** Adds a state's copy to the current event-list. */
+    function addEventCopy(state)
+    {
+        var copy = new Guacamole.Mouse.State(state.x, state.y, state.left,
+            state.middle, state.right, state.up, state.down);
+
+        events.push(copy);
+    }
+
+    /** Sets a new timeout-callback, replacing the old one. */
+    function setNewTimeout(callback, timeout)
+    {
+        if (handler != null)
+            window.clearTimeout(handler);
+
+        handler = window.setTimeout(callback, timeout);
+    }
+
+    /** Handler, called on timeout. */
+    function onTimeout()
+    {
+        while (events.length > 0)
+            client.sendMouseState(events.shift());
+
+        handler = null;
+        waiting = false;
+    };
+
+
+    /** Handler for mouse-down events. */
+    this.onmousedown = function(state)
+    {
+        setNewTimeout(onTimeout, 100);
+        addEventCopy(state);
+        waiting = true;
+    };
+
+    /** Handler for mouse-up events. */
+    this.onmouseup = function(state)
+    {
+        setNewTimeout(onTimeout, 150);
+        addEventCopy(state);
+        waiting = true;
+    };
+
+    /** Handler for mouse-move events. */
+    this.onmousemove = function(state)
+    {
+        if (waiting == true)
+            addEventCopy(state);
+        else client.sendMouseState(state);
+    };
+};
+
+var BWFLA = BWFLA || {};
+
+
+/** Requests a pointer-lock on given element, if supported by the browser. */
+BWFLA.requestPointerLock = function(target, event)
+{
+    function lockPointer() {
+        var havePointerLock = 'pointerLockElement' in document
+            || 'mozPointerLockElement' in document
+            || 'webkitPointerLockElement' in document;
+
+        if (!havePointerLock) {
+            var message = "Your browser does not support the PointerLock API!\n"
+                + "Using relative mouse is not possible.\n\n"
+                + "Mouse input will be disabled for this virtual environment.";
+
+            console.warn(message);
+            alert(message);
+            return;
+        }
+
+        // Activate pointer-locking
+        target.requestPointerLock = target.requestPointerLock
+            || target.mozRequestPointerLock
+            || target.webkitRequestPointerLock;
+
+        target.requestPointerLock();
+    };
+
+    function enableLockEventListener()
+    {
+        target.addEventListener(event, lockPointer, false);
+    };
+
+    function disableLockEventListener()
+    {
+        target.removeEventListener(event, lockPointer, false);
+    };
+
+    function onPointerLockChange() {
+        if (document.pointerLockElement === target
+            || document.mozPointerLockElement === target
+            || document.webkitPointerLockElement === target) {
+            // Pointer was just locked
+            console.debug("Pointer was locked!");
+            target.isPointerLockEnabled = true;
+            disableLockEventListener();
+        } else {
+            // Pointer was just unlocked
+            console.debug("Pointer was unlocked.");
+            target.isPointerLockEnabled = false;
+            enableLockEventListener();
+        }
+    };
+
+    function onPointerLockError(error) {
+        var message = "Pointer lock failed!";
+        console.warn(message);
+        alert(message);
+    }
+
+    // Hook for pointer lock state change events
+    document.addEventListener('pointerlockchange', onPointerLockChange, false);
+    document.addEventListener('mozpointerlockchange', onPointerLockChange, false);
+    document.addEventListener('webkitpointerlockchange', onPointerLockChange, false);
+
+    // Hook for pointer lock errors
+    document.addEventListener('pointerlockerror', onPointerLockError, false);
+    document.addEventListener('mozpointerlockerror', onPointerLockError, false);
+    document.addEventListener('webkitpointerlockerror', onPointerLockError, false);
+
+    enableLockEventListener();
+
+    // Set flag for relative-mouse mode
+    target.isRelativeMouse = true;
+};
+
+
+/** Hides the layer containing client-side mouse-cursor. */
+BWFLA.hideClientCursor = function(guac)
+{
+    var display = guac.getDisplay();
+    display.showCursor(false);
+};
+
+
+/** Shows the layer containing client-side mouse-cursor. */
+BWFLA.showClientCursor = function(guac)
+{
+    var display = guac.getDisplay();
+    display.showCursor(true);
 };

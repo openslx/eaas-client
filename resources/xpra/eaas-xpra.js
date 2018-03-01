@@ -19,11 +19,9 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var username = getparam("username") || null;
         var password = getparam("password") || null;
         var sound = true;
-        if (Utilities.isFirefox()) {
+        if (Utilities.isFirefox() || Utilities.isChrome()) {
             var audio_codec = getparam("audio_codec") || "http-stream:mp3";
-        } else if(Utilities.isChrome()){
-            var audio_codec = getparam("audio_codec") || "mediasource:mp3";
-        } else if(Utilities.isSafari()){
+      } else if(Utilities.isSafari()){
             var audio_codec = getparam("audio_codec") || "legacy:wav";
         } else
             var audio_codec = getparam("audio_codec") || null;
@@ -38,8 +36,8 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var key = getparam("key") || null;
         var keyboard_layout = getparam("keyboard_layout") || null;
         var start = getparam("start");
-        var exit_with_children = getboolparam("exit_with_children", false);
-        var exit_with_client = getboolparam("exit_with_client", false);
+        var exit_with_children = getboolparam("exit_with_children", true);
+        var exit_with_client = getboolparam("exit_with_client", true);
         var sharing = getboolparam("sharing", false);
         var video = getboolparam("video", false);
         var mediasource_video = getboolparam("mediasource_video", false);
@@ -48,10 +46,10 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var insecure = getboolparam("insecure", false);
         var ignore_audio_blacklist = getboolparam("ignore_audio_blacklist", false);
         var clipboard = getboolparam("clipboard", true);
-        var printing = getboolparam("printing", true);
-        var file_transfer = getboolparam("file_transfer", true);
+        var printing = getboolparam("printing", false);
+        var file_transfer = getboolparam("file_transfer", false);
         var steal = getboolparam("steal", true);
-        var reconnect = getboolparam("reconnect", true);
+        var reconnect = getboolparam("reconnect", false);
         var swap_keys = getboolparam("swap_keys", Utilities.isMacOS());
         //delete sensitive session params:
         try {
@@ -66,39 +64,40 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var progress_value = 0;
         var progress_offset = 0;
         // show connection progress:
-        function connection_progress(state, details, progress) {
-            clog("connection_progress(", state, ", ", details, ", ", progress, ")");
-            if (progress>=100) {
-                $('#progress').hide();
-            }
-            else {
-                $('#progress').show();
-            }
-            $('#progress-label').text(state || " ");
-            $('#progress-details').text(details || " ");
-            $('#progress-bar').val(progress);
-            progress_value = progress;
-            if (progress_timer) {
-                window.clearTimeout(progress_timer);
-                progress_timer = null;
-            }
-            if (progress<100) {
-                progress_move_offset();
-            }
-        }
+        // function connection_progress(state, details, progress) {
+        //     clog("connection_progress(", state, ", ", details, ", ", progress, ")");
+        //     if (progress>=100) {
+        //         $('#progress').hide();
+        //     }
+        //     else {
+        //         $('#progress').show();
+        //     }
+        //     $('#progress-label').text(state || " ");
+        //     $('#progress-details').text(details || " ");
+        //     $('#progress-bar').val(progress);
+        //     progress_value = progress;
+        //     if (progress_timer) {
+        //         window.clearTimeout(progress_timer);
+        //         progress_timer = null;
+        //     }
+        //     if (progress<100) {
+        //         progress_move_offset();
+        //     }
+        // }
         // the offset is just to make the user feel better
         // nothing changes, but we just show a slow progress
         function progress_move_offset() {
-            progress_timer = null;
-            progress_offset++;
-            $('#progress-bar').val(progress_value + progress_offset);
-            if (progress_offset<9) {
-                progress_timer = window.setTimeout(progress_move_offset, (5+progress_offset)*progress_offset);
-            }
+            // progress_timer = null;
+            // progress_offset++;
+            // $('#progress-bar').val(progress_value + progress_offset);
+            // if (progress_offset<9) {
+            //     progress_timer = window.setTimeout(progress_move_offset, (5+progress_offset)*progress_offset);
+            // }
         }
 
         // create the client
         var client = new XpraClient('emulator-container');
+        client.steal = false;
         client.debug = debug;
         client.remote_logging = remote_logging;
         client.sharing = sharing;
@@ -110,7 +109,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         client.steal = steal;
         client.reconnect = reconnect;
         client.swap_keys = swap_keys;
-        client.on_connection_progress = connection_progress;
+        // client.on_connection_progress = connection_progress;
         //example overrides:
         //client.HELLO_TIMEOUT = 3600000;
         //client.PING_TIMEOUT = 60000;
@@ -476,14 +475,15 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             );
             win.debug = this.debug;
             win._set_decorated(false);
+            win.updateCSSGeometry();
             this.id_to_window[wid] = win;
             if (!override_redirect) {
                 var geom = win.get_internal_geometry();
                 this.send(["map-window", wid, geom.x, geom.y, geom.w, geom.h, this._get_client_properties(win)]);
                 this._window_set_focus(win);
             }
-            win.updateCanvasGeometry();
         };
+
         client.open_protocol = function() {
             // set protocol to deliver packets to our packet router
             this.protocol.set_packet_handler(this._route_packet, this);
@@ -500,6 +500,9 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             this.on_connection_progress("Opening WebSocket connection", uri, 60);
             this.protocol.open(uri);
         };
+
+
+
 
         client.connect(xpraPath);
 
@@ -549,36 +552,11 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         }
 
         XpraWindow.prototype.update_zindex = function() {
-            var z = 5000 + this.stacking_layer;
-            if (this.override_redirect || this.client.server_is_desktop) {
-                z = 15000;
-            }
-            else if (this.windowtype=="DROPDOWN" || this.windowtype=="TOOLTIP" ||
-                this.windowtype=="POPUP_MENU" || this.windowtype=="MENU" ||
-                this.windowtype=="COMBO") {
-                z = 20000;
-            }
-            else if (this.windowtype=="UTILITY" || this.windowtype=="DIALOG") {
-                z = 15000;
-            }
-            var above = this.metadata["above"];
-            if (above) {
-                z += 5000;
-            }
-            else {
-                var below = this.metadata["below"];
-                if (below) {
-                    z -= 5000;
-                }
-            }
-            if (this.focused) {
-                z += 2500;
-            }
             jQuery(this.div).css('z-index', 1000);
         }
 
         XpraWindow.prototype.getMouse = function(e) {
-            var eaas_offset_y = 20; // the size of the top frame (which we deleted for our eaas usecase)
+            //var eaas_offset_y = 20; // the size of the top frame (which we deleted for our eaas usecase)
             // get mouse position take into account scroll
             var mx = e.clientX + jQuery(document).scrollLeft();
             var my = e.clientY + jQuery(document).scrollTop();
@@ -617,12 +595,49 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
 
             var offset = $("#emulator-container").offset();
             mx = mx - offset.left;
-            my = my - offset.top + eaas_offset_y;
+            my = my - offset.top //+ eaas_offset_y
+            ;
             return {x: mx, y: my, button: mbutton};
         };
     });
 
+    XpraClient.prototype.init_keyboard = function() {
+        var me = this;
+        // modifier keys:
+        this.caps_lock = null;
+        this.num_lock = true;
+        this.num_lock_mod = null;
+        this.alt_modifier = null;
+        this.meta_modifier = null;
+        // assign the keypress callbacks
+        // if we detect jQuery, use that to assign them instead
+        // to allow multiple clients on the same page
+        document.addEventListener('keydown', function(e) {
+            if ($('#emulator-container').is(":visible")) {
+                var r = me._keyb_onkeydown(e, me);
+                if (!r) {
+                    e.preventDefault();
+                }
+            }
+        });
+        document.addEventListener('keyup', function (e) {
+            if ($('#emulator-container').is(":visible")) {
+                var r = me._keyb_onkeyup(e, me);
+                if (!r) {
+                    e.preventDefault();
+                }
+            }
+        });
+        document.addEventListener('keypress', function (e) {
+            if ($('#emulator-container').is(":visible")) {
+                var r = me._keyb_onkeypress(e, me);
+                if (!r) {
+                    e.preventDefault();
+                }
+            }
+        });
 
+    };
     MediaSourceUtil.getMediaSourceAudioCodecs = function(ignore_blacklist) {
         var media_source_class = MediaSourceUtil.getMediaSourceClass();
         if(!media_source_class) {
