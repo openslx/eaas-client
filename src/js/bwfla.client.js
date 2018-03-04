@@ -188,6 +188,40 @@ EaasClient.Client = function (api_entrypoint, container) {
          */
     };
 
+    this.getContainerResultUrl = function()
+    {
+        console.log(_this.componentId);
+        return API_URL + formatStr("/components/{0}/result", _this.componentId);
+    }
+
+    this.startContainer = function(containerId, args)
+    {
+        var data = {};
+        data.type = "container";
+        data.environment = containerId;
+
+        console.log("Starting container " + containerId + "...");
+        var deferred = $.Deferred();
+
+        $.ajax({
+            type: "POST",
+            url: API_URL + "/components",
+                data: JSON.stringify(data),
+                contentType: "application/json"
+        })
+            .then(function (data, status, xhr) {
+                console.log("container " + containerId + " started.");
+                _this.componentId = data.id;
+                _this.isStarted = true;
+                _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                deferred.resolve();
+            },
+            function (xhr) {
+                _this._onFatalError($.parseJSON(xhr.responseText));
+                deferred.reject();
+            });
+        return deferred.promise();
+    };
 
     this.startEnvironment = function (environmentId, args) {
         var data = {};
