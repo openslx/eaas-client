@@ -29,6 +29,11 @@ function XpraProtocolWorkerHost() {
 
 XpraProtocolWorkerHost.prototype.open = function(uri) {
 	var me = this;
+	if (this.worker) {
+		//re-use the existing worker:
+		this.worker.postMessage({'c': 'o', 'u': uri});
+		return;
+	}
 	this.worker = new Worker('js/Protocol.js');
 	this.worker.addEventListener('message', function(e) {
 		var data = e.data;
@@ -101,12 +106,21 @@ function XpraProtocol() {
 
 XpraProtocol.prototype.open = function(uri) {
 	var me = this;
-	// init
-	this.rQ		 = [];
-	this.sQ		 = [];
+	// (re-)init
+	this.raw_packets = [];
+	this.rQ = [];
+	this.sQ	= [];
+	this.mQ = [];
+	this.header  = [];
 	this.websocket  = null;
 	// connect the socket
-	this.websocket = new WebSocket(uri, 'binary');
+	try {
+		this.websocket = new WebSocket(uri, 'binary');
+	}
+	catch (e) {
+		this.packet_handler(['error', ""+e], this.packet_ctx);
+		return;
+	}
 	this.websocket.binaryType = 'arraybuffer';
 	this.websocket.onopen = function () {
 		me.packet_handler(['open'], me.packet_ctx);
@@ -124,26 +138,31 @@ XpraProtocol.prototype.open = function(uri) {
 				me.process_receive_queue();
 			}, this.process_interval);
 	};
-	this.start_processing();
 }
 
 XpraProtocol.prototype.close = function() {
-	this.stop_processing();
-	this.websocket.close();
+	if (this.websocket) {
+		this.websocket.onopen = null;
+		this.websocket.onclose = null;
+		this.websocket.onerror = null;
+		this.websocket.onmessage = null;
+		this.websocket.close();
+		this.websocket = null;
+	}
 }
 
-XpraProtocol.prototype.terminate = function() {
-	this.stop_processing();
-	// if this is called here we are not in a worker, so
-	// do nothing
-	return;
+XpraProtocol.prototype.protocol_error = function(msg) {
+	console.error("protocol error:", msg);
+	//make sure we stop processing packets and events:
+	this.websocket.onopen = null;
+	this.websocket.onclose = null;
+	this.websocket.onerror = null;
+	this.websocket.onmessage = null;
+	this.header = [];
+	this.rQ = [];
+	//and just tell the client to close (it may still try to re-connect):
+	this.packet_handler(['close', msg]);
 }
-
-XpraProtocol.prototype.start_processing = function() {
-}
-XpraProtocol.prototype.stop_processing = function() {
-}
-
 
 XpraProtocol.prototype.process_receive_queue = function() {
 	var i = 0, j = 0;
@@ -177,7 +196,8 @@ XpraProtocol.prototype.process_receive_queue = function() {
 					msg += String.fromCharCode(c);
 				}
 			}
-			throw msg;
+			this.protocol_error(msg);
+			return;
 		}
 	}
 
@@ -191,17 +211,20 @@ XpraProtocol.prototype.process_receive_queue = function() {
 	if (proto_flags!=0) {
 		// check for crypto protocol flag
 		if (!(proto_crypto)) {
-			throw "we can't handle this protocol flag yet, sorry";
+			this.protocol_error("we can't handle this protocol flag yet: "+proto_flags);
+			return;
 		}
 	}
 
 	var level = this.header[2];
 	if (level & 0x20) {
-		throw "lzo compression is not supported";
+		this.protocol_error("lzo compression is not supported");
+		return;
 	}
 	var index = this.header[3];
 	if (index>=20) {
-		throw "invalid packet index: "+index;
+		this.protocol_error("invalid packet index: "+index);
+		return;
 	}
 	var packet_size = 0;
 	for (i=0; i<4; i++) {
@@ -281,7 +304,7 @@ XpraProtocol.prototype.process_receive_queue = function() {
 			var uncompressedSize = LZ4.decodeBlock(packet_data, inflated, 4);
 			// if lz4 errors out at the end of the buffer, ignore it:
 			if (uncompressedSize<=0 && packet_size+uncompressedSize!=0) {
-				console.error("failed to decompress lz4 data, error code:", uncompressedSize);
+				this.protocol_error("failed to decompress lz4 data, error code: "+uncompressedSize);
 				return;
 			}
 		} else {
@@ -316,12 +339,6 @@ XpraProtocol.prototype.process_receive_queue = function() {
 					packet[7] = uint;
 				}
 			}
-			else if(packet[0]=="sound-data") {
-				var sound_data = packet[2];
-				if (!Array.isArray(sound_data)) {
-					packet[2] = Array.from(sound_data);
-				}
-			}
 			if (this.is_worker){
 				this.mQ[this.mQ.length] = packet;
 				var me = this;
@@ -333,6 +350,7 @@ XpraProtocol.prototype.process_receive_queue = function() {
 			}
 		}
 		catch (e) {
+			//FIXME: maybe we should error out and disconnect here?
 			console.error("error processing packet " + e)
 			//console.error("packet_data="+packet_data);
 		}
@@ -340,14 +358,21 @@ XpraProtocol.prototype.process_receive_queue = function() {
 }
 
 XpraProtocol.prototype.process_send_queue = function() {
-	while(this.sQ.length !== 0) {
+	while(this.sQ.length !== 0 && this.websocket) {
 		var packet = this.sQ.shift();
 		if(!packet){
 			return;
 		}
 
 		//debug("send worker:"+packet);
-		var bdata = bencode(packet);
+		var bdata = null;
+		try {
+			bdata = bencode(packet);
+		}
+		catch (e) {
+			console.error("Error: failed to bencode packet:", packet);
+			continue;
+		}
 		var proto_flags = 0;
 		var payload_size = bdata.length;
 		// encryption
@@ -381,7 +406,9 @@ XpraProtocol.prototype.process_send_queue = function() {
 		header = header.concat(cdata);
 		//debug("send("+packet+") "+cdata.length+" bytes in packet for: "+bdata.substring(0, 32)+"..");
 		// put into buffer before send
-		this.websocket.send((new Uint8Array(header)).buffer);
+		if (this.websocket) {
+			this.websocket.send((new Uint8Array(header)).buffer);
+		}
 	}
 }
 

@@ -5,11 +5,36 @@ html, body {
 	margin: 0;
 	overflow: hidden;
 }
+
+body.desktop {
+	background-color: #555;
+}
+
 div#connect_form {
 	display: none;
 }
 div#disconnect_form {
 	display: none;
+}
+.overlay {
+	background-color: black;
+	position: fixed;
+	top: 0; right: 0; bottom: 0; left: 0;
+	opacity: 0.5;
+	z-index: 100000;
+	text-align: center;
+}
+#progress-label {
+	font-size: 1.4em;
+	color: white;
+	line-height: 2em;
+	height: 2em;
+}
+#progress-details {
+	font-size: 1.2em;
+	color: white;
+	line-height: 1.5em;
+	height: 1.5em;
 }
 canvas {
 	border: none;
@@ -29,7 +54,6 @@ canvas {
 	overflow: hidden;
 }
 .override-redirect {
-	z-index: 15000;
 }
 .window {
 	border: 1px;
@@ -38,29 +62,13 @@ canvas {
 	padding: 0;
 	overflow: hidden; /* required for radius clip */
 }
+.window.desktop {
+	border-radius: 0;
+	box-shadow: none;
+}
+
 .window-NORMAL {
 	border-radius: 6px;
-}
-.window-DROPDOWN_MENU {
-	z-index: 20000;
-}
-.window-TOOLTIP {
-	z-index: 20000;
-}
-.window-POPUP_MENU {
-	z-index: 20000;
-}
-.window-MENU {
-	z-index: 20000;
-}
-.window-COMBO {
-	z-index: 20000;
-}
-.window-UTILITY {
-	z-index: 15000;
-}
-.window-DIALOG {
-	z-index: 15000;
 }
 .windowhead {
 	height: 30px;
@@ -82,7 +90,7 @@ canvas {
 	float: left;
 	position: absolute;
 	top: 0px;
-	left: 30px;
+	left: 0px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	padding: 5px;
@@ -101,8 +109,17 @@ canvas {
 	padding-top: 7px;
 	background-color: #c0c0c0;
 }
-.windowinfocus {
+.above {
 	z-index: 10000;
+}
+.below {
+	z-index: 0;
+}
+div.windowinfocus {
+	z-index: 5000;
+}
+.modal {
+	z-index: 20000;
 }
 .spinneroverlay {
 	width: 100%;
