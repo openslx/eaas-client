@@ -423,6 +423,44 @@ EaasClient.Client = function (api_entrypoint, container) {
         $(container).empty();
     };
 
+
+    this.getHandleList = function () {
+        return $.ajax({
+            type: "GET",
+            url: API_URL + "/components/" + "getHandleList"
+        })
+    };
+
+    this.createHandle = function (handle, handleValue) {
+        var postReq = {};
+        postReq.handle = handle;
+        postReq.handleValue = handleValue;
+        return $.ajax({
+            type: "POST",
+            url: API_URL + "/components/" + "createHandle",
+            data: JSON.stringify(postReq),
+            contentType: "application/json"
+        })
+    };
+
+    this.modifyHandle = function (handle, handleValue) {
+        var postReq = {};
+        postReq.handle = handle;
+        postReq.handleValue = handleValue;
+        return $.ajax({
+            type: "POST",
+            url: API_URL + "/components/" + "modifyHandle",
+            data: JSON.stringify(postReq),
+            contentType: "application/json"
+        })
+    };
+    this.deleteHandle = function (handle) {
+        return $.ajax({
+            type: "POST",
+            url: API_URL + formatStr("/components/deleteHandle?handle={0}" , encodeURI(handle))
+        })
+    };
+
     this.clearTimer = function () {
         clearInterval(this.keepaliveIntervalId);
     };
