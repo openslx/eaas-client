@@ -199,6 +199,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         var data = {};
         data.type = "container";
         data.environment = containerId;
+	data.input_data = args.input_data;
 
         console.log("Starting container " + containerId + "...");
         var deferred = $.Deferred();
