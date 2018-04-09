@@ -287,7 +287,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     // Checkpoints a running session
-    this.checkpoint = function () {
+    this.checkpoint = function (request) {
         var deferred = $.Deferred();
 
         if (!this.isStarted) {
@@ -300,10 +300,12 @@ EaasClient.Client = function (api_entrypoint, container) {
         $.ajax({
             type: "POST",
             url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
-            timeout: 30000
+            timeout: 30000,
+			contentType: "application/json",
+			data: JSON.stringify(request)
         })
             .done(function (data, status, xhr) {
-                var envid = data.environment_id;
+                var envid = data.envId;
                 console.log("Checkpoint created: " + envid);
                 deferred.resolve(envid);
             })
@@ -350,6 +352,11 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.release = function () {
         this.stopEnvironment();
         this.clearTimer();
+		$.ajax({
+            type: "DELETE",
+            url: API_URL + formatStr("/components/{0}", _this.componentId),
+            async: false,
+        });
     };
 
     this.sendCtrlAltDel = function() {
