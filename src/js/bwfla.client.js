@@ -32,6 +32,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
 
     this.componentId = null;
+    this.componentId2 = null;
     this.networkId = null;
     this.driveId = null;
     this.params = null;
@@ -108,6 +109,10 @@ EaasClient.Client = function (api_entrypoint, container) {
         var url = null;
         if (_this.networkId != null) {
             url = formatStr("/networks/{0}/keepalive", _this.networkId);
+            $.post(API_URL + url);
+            url = formatStr("/components/{0}/keepalive", _this.componentId);
+            $.post(API_URL + url);
+            url = formatStr("/components/{0}/keepalive", _this.componentId2);
         } else if (_this.componentId != null) {
             url = formatStr("/components/{0}/keepalive", _this.componentId);
         }
@@ -812,13 +817,14 @@ EaasClient.Client = function (api_entrypoint, container) {
                                 {componentId: data1.id},
                                 {componentId: data2.id}
                             ],
-                            hasInternet: true
+                            hasInternet: false
                         }),
                         contentType: "application/json"
                     }).then(function (network_data, status3, xhr3) {
                         _this.componentId = data1.id;
                         _this.driveId = data1.driveId;
                         _this.networkId = network_data.id;
+                        _this.componentId2 = data2.id;
                         _this.isStarted = true;
                         _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
                         deferred.resolve();
