@@ -111,8 +111,10 @@ EaasClient.Client = function (api_entrypoint, container) {
             url = formatStr("/networks/{0}/keepalive", _this.networkId);
             $.post(API_URL + url);
             url = formatStr("/components/{0}/keepalive", _this.componentId);
-            $.post(API_URL + url);
-            url = formatStr("/components/{0}/keepalive", _this.componentId2);
+            if (_this.componentId2 != null) {
+                $.post(API_URL + url);
+                url = formatStr("/components/{0}/keepalive", _this.componentId2);
+            }
         } else if (_this.componentId != null) {
             url = formatStr("/components/{0}/keepalive", _this.componentId);
         }
