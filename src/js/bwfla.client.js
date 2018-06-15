@@ -33,6 +33,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     this.componentId = null;
     this.componentId2 = null;
+    this.networkTcpInfo = null;
     this.networkId = null;
     this.driveId = null;
     this.params = null;
@@ -249,6 +250,31 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data.lockEnvironment = true;
         }
 
+        var connectNetwork = function(data)
+        {
+            $.ajax({
+                type: "POST",
+                url: API_URL + "/networks",
+                data: JSON.stringify({
+                    components: [{
+                        componentId:  data.id
+                    }],
+                    hasInternet: args.hasInternet ? true : false,
+                    hasTcpGateway: args.hasTcpGateway ? true : false,
+                    tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
+                }),
+                contentType: "application/json"
+            }).then(function (network_data, status, xhr) {
+                _this.componentId =  data.id;
+                _this.driveId =  data.driveId;
+                _this.networkId = network_data.id;
+                _this.networkTcpInfo = network_data.networkUrls != null ? network_data.networkUrls.tcp : null;
+                _this.isStarted = true;
+                _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                deferred.resolve();
+            })
+        }
+
         var deferred = $.Deferred();
 
         console.log("Starting environment " + environmentId + "...");
@@ -258,18 +284,25 @@ EaasClient.Client = function (api_entrypoint, container) {
             data: JSON.stringify(data),
             contentType: "application/json"
         })
-            .then(function (data, status, xhr) {
-                    console.log("Environment " + environmentId + " started.");
+        .then(function (data, status, xhr) {
+                console.log("Environment " + environmentId + " started.");
+                if(args.tcpGatewayConfig || args.hasInternet)
+                {
+                    connectNetwork(data);
+                }
+                else
+                {
                     _this.componentId = data.id;
                     _this.driveId = data.driveId;
                     _this.isStarted = true;
                     _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
                     deferred.resolve();
-                },
-                function (xhr) {
-                    _this._onFatalError($.parseJSON(xhr.responseText));
-                    deferred.reject();
-                });
+                }
+        },
+        function (xhr) {
+               _this._onFatalError($.parseJSON(xhr.responseText));
+                deferred.reject();
+        });
 
         return deferred.promise();
     };
@@ -662,6 +695,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                         _this.componentId =  data.id;
                         _this.driveId =  data.driveId;
                         _this.networkId = network_data.id;
+                        _this.networkTcpInfo = network_data.networkUrls != null ? network_data.networkUrls.tcp : null;
                         _this.isStarted = true;
                         _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
                         deferred.resolve();
@@ -715,70 +749,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
-    // TODO: add Lklsocks support
-    // this.startEnvironmentWithSocks = function (environmentId, args) {
-    //     var request = {};
-    //     request.type = "machine";
-    //     request.environment = environmentId;
-    //
-    //     if (typeof args !== "undefined") {
-    //         request.keyboardLayout = args.keyboardLayout;
-    //         request.keyboardModel = args.keyboardModel;
-    //         request.object = args.object;
-    //
-    //         if (args.object == null) {
-    //             request.software = args.software;
-    //         }
-    //         request.userContext = args.userContext;
-    //     }
-    //
-    //     var data2 = {};
-    //     data2.type = "socks";
-    //
-    //
-    //     var deferred = $.Deferred();
-    //
-    //     console.log("Starting environment " + environmentId + "...");
-    //     $.ajax({
-    //         type: "POST",
-    //         url: API_URL + "/components",
-    //         data: JSON.stringify(request),
-    //         contentType: "application/json"
-    //     }).then(function (machine_response, status1, xhr1) {
-    //             console.log("Environment " + environmentId + " started.");
-    //             $.ajax({
-    //                 type: "POST",
-    //                 url: API_URL + "/components",
-    //                 data: JSON.stringify(data2),
-    //                 contentType: "application/json"
-    //             }).then(function (socks_data, status2, xhr2) {
-    //                     $.ajax({
-    //                         type: "POST",
-    //                         url: API_URL + "/networks",
-    //                         data: JSON.stringify({
-    //                             components: [
-    //                                 {componentId: machine_response.id},
-    //                                 {componentId: socks_data.id}
-    //                            ]
-    //                         }),
-    //                         contentType: "application/json"
-    //                     }).then(function (network_data, status3, xhr3) {
-    //                         _this.componentId = machine_response.id;
-    //                         _this.driveId = machine_response.driveId;
-    //                         _this.networkId = network_data.id;
-    //                         _this.isStarted = true;
-    //                         _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-    //                         deferred.resolve();
-    //                     })
-    //                     })
-    //                 },
-    //                 function (xhr2) {
-    //                     _this._onFatalError($.parseJSON(xhr.responseText));
-    //                     deferred.reject();
-    //                 });
-    //             return deferred.promise();
-    // }
-
+  
     this.startConnectedEnvironments = function (environmentId1, environmentId2, args) {
         var data = {};
         data.type = "machine";
