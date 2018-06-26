@@ -12,7 +12,6 @@ The user should include following scripts in his HTML/HEAD:
 ```
 /target/eaas-client-0.0.3/guacamole/guacamole.js
 /target/eaas-client-0.0.3/eaas-client.js
-/target/eaas-client-0.0.3/xpra/www/js/lib/aurora/aurora.js
 /target/eaas-client-0.0.3/xpra/www/js/lib/jquery-3.1.1.min.js
 
 ```
