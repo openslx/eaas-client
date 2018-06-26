@@ -108,18 +108,20 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     this.keepalive = function () {
         var url = null;
+
         if (_this.networkId != null) {
-            url = formatStr("/networks/{0}/keepalive", _this.networkId);
-            $.post(API_URL + url);
-            url = formatStr("/components/{0}/keepalive", _this.componentId);
-            if (_this.componentId2 != null) {
-                $.post(API_URL + url);
-                url = formatStr("/components/{0}/keepalive", _this.componentId2);
+            if (typeof _this.ids != "undefined"){
+                //FIXME we should send only one keepalive
+                for (let i = 0; i < _this.ids.length; i++) {
+                    url = formatStr("/components/{0}/keepalive", _this.ids[i]);
+                    $.post(API_URL + url);
+                    console.log("send request: " + url)
+                }
             }
+            url = formatStr("/networks/{0}/keepalive", _this.networkId);
         } else if (_this.componentId != null) {
             url = formatStr("/components/{0}/keepalive", _this.componentId);
         }
-
         $.post(API_URL + url);
     };
 
@@ -232,7 +234,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
-    this.startEnvironment = function (environmentId, args) {
+    this.startEnvironment = function (environmentId, args, ...environmentIds) {
         var data = {};
         data.type = "machine";
         data.environment = environmentId;
@@ -250,30 +252,64 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data.lockEnvironment = true;
         }
 
-        var connectNetwork = function(data)
+        var connectNetwork = function (data, ids)
         {
+
+            if (typeof ids != "undefined") {
+                components = [];
+                for (let i = 0; i < ids.length; i++) {
+                    components.push({componentId: ids[i]});
+                }
+            }
+            else {
+                components = {
+                    componentId: data.id
+                }
+            }
+
             $.ajax({
                 type: "POST",
                 url: API_URL + "/networks",
                 data: JSON.stringify({
-                    components: [{
-                        componentId:  data.id
-                    }],
+                    components,
                     hasInternet: args.hasInternet ? true : false,
-                    hasTcpGateway: args.hasTcpGateway ? true : false,
-                    tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
+                    // hasTcpGateway: args.hasTcpGateway ? true : false,
+                    // tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
                 }),
                 contentType: "application/json"
             }).then(function (network_data, status, xhr) {
-                _this.componentId =  data.id;
-                _this.driveId =  data.driveId;
+                _this.componentId = data.id;
+                if (typeof ids != "undefined")
+                    _this.ids = ids;
+
+                _this.driveId = data.driveId;
                 _this.networkId = network_data.id;
                 _this.networkTcpInfo = network_data.networkUrls != null ? network_data.networkUrls.tcp : null;
                 _this.isStarted = true;
                 _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
                 deferred.resolve();
             })
-        }
+        };
+
+
+        var connectEnvs = function(firstEnvData) {
+            var ids = [firstEnvData.id];
+            for (let i = 0; i < environmentIds.length; i++) {
+                console.log("env: " + environmentIds[i]);
+                data.environment = environmentIds[i];
+                $.ajax({
+                    type: "POST",
+                    url: API_URL + "/components",
+                    success: function(envData, status2, xhr2){
+                        ids.push(envData.id);
+                    },
+                    async:false,
+                    data: JSON.stringify(data),
+                    contentType: "application/json"
+                })
+            }
+            connectNetwork(firstEnvData, ids);
+        };
 
         var deferred = $.Deferred();
 
@@ -286,12 +322,11 @@ EaasClient.Client = function (api_entrypoint, container) {
         })
         .then(function (data, status, xhr) {
                 console.log("Environment " + environmentId + " started.");
-                if(args.tcpGatewayConfig || args.hasInternet)
-                {
+                if (typeof  environmentIds != "undefined") {
+                    connectEnvs(data)
+                } else if (args.tcpGatewayConfig || args.hasInternet) {
                     connectNetwork(data);
-                }
-                else
-                {
+                } else {
                     _this.componentId = data.id;
                     _this.driveId = data.driveId;
                     _this.isStarted = true;
@@ -536,33 +571,43 @@ EaasClient.Client = function (api_entrypoint, container) {
                 var eaasClientPath = scripts[prop].src;
             }
         }
-        var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra/";
-
+        if(typeof eaasClientPath == "undefined") {
+            xpraPath = "xpra/";
+        } else {
+            var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra/";
+        }
         jQuery.when(
-            jQuery.getScript(xpraPath + '/eaas-xpra.js'),
+            jQuery.getScript(xpraPath + '/js/lib/zlib.js'),
+
+            jQuery.getScript(xpraPath + '/js/lib/aurora/aurora.js'),
+            jQuery.getScript(xpraPath + '/js/lib/lz4.js'),
             jQuery.getScript(xpraPath + '/js/lib/jquery-ui.js'),
             jQuery.getScript(xpraPath + '/js/lib/jquery.ba-throttle-debounce.js'),
-            jQuery.getScript(xpraPath + '/js/lib/bencode.js'),
-            jQuery.getScript(xpraPath + '/js/lib/zlib.js'),
-            jQuery.getScript(xpraPath + '/js/lib/forge.js'),
-            jQuery.getScript(xpraPath + '/js/lib/wsworker_check.js'),
-            jQuery.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
-            jQuery.getScript(xpraPath + '/js/lib/aurora/aurora-xpra.js'),
-            jQuery.getScript(xpraPath + '/js/Keycodes.js'),
-            jQuery.getScript(xpraPath + '/js/Utilities.js'),
-            jQuery.getScript(xpraPath + '/js/Notifications.js'),
-            jQuery.getScript(xpraPath + '/js/MediaSourceUtil.js'),
-            jQuery.getScript(xpraPath + '/js/Window.js'),
-            jQuery.getScript(xpraPath + '/js/Protocol.js'),
-            jQuery.getScript(xpraPath + '/js/Client.js'),
-
             jQuery.Deferred(function (deferred) {
                 jQuery(deferred.resolve);
-            })
-        ).done(function () {
-            loadXpra(xpraUrl, xpraPath, _this.xpraConf);
-        })
+            })).done(function () {
+            jQuery.when(
+                jQuery.getScript(xpraPath + '/js/lib/bencode.js'),
+                jQuery.getScript(xpraPath + '/js/lib/forge.js'),
+                jQuery.getScript(xpraPath + '/js/lib/wsworker_check.js'),
+                jQuery.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
+                jQuery.getScript(xpraPath + '/js/lib/aurora/aurora-xpra.js'),
+                jQuery.getScript(xpraPath + '/eaas-xpra.js'),
+                jQuery.getScript(xpraPath + '/js/Keycodes.js'),
+                jQuery.getScript(xpraPath + '/js/Utilities.js'),
+                jQuery.getScript(xpraPath + '/js/Notifications.js'),
+                jQuery.getScript(xpraPath + '/js/MediaSourceUtil.js'),
+                jQuery.getScript(xpraPath + '/js/Window.js'),
+                jQuery.getScript(xpraPath + '/js/Protocol.js'),
+                jQuery.getScript(xpraPath + '/js/Client.js'),
 
+                jQuery.Deferred(function (deferred) {
+                    jQuery(deferred.resolve);
+                })).done(function () {
+                    loadXpra(xpraUrl, xpraPath, _this.xpraConf);
+                }
+            )
+        })
     };
 
     this.prepareAndLoadWebEmulator = function (url) {
@@ -652,62 +697,6 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
-
-
-    this.startEnvironmentWithInternet = function (environmentId, args) {
-        var data = {};
-        data.type = "machine";
-        data.environment = environmentId;
-
-        if (typeof args !== "undefined") {
-            data.keyboardLayout = args.keyboardLayout;
-            data.keyboardModel = args.keyboardModel;
-            data.object = args.object;
-
-            if (args.object == null) {
-                data.software = args.software;
-            }
-            data.userId = args.userId;
-        }
-
-        var deferred = $.Deferred();
-
-        console.log("Starting environment " + environmentId + "...");
-        $.ajax({
-            type: "POST",
-            url: API_URL + "/components",
-            data: JSON.stringify(data),
-            contentType: "application/json"
-        })
-            .then(function (data, status, xhr2) {
-                    console.log("Environment " + environmentId + " started.");
-                    $.ajax({
-                        type: "POST",
-                        url: API_URL + "/networks",
-                        data: JSON.stringify({
-                            components: [{
-                                componentId:  data.id
-                            }],
-                            hasInternet: true
-                        }),
-                        contentType: "application/json"
-                    }).then(function (network_data, status, xhr) {
-                        _this.componentId =  data.id;
-                        _this.driveId =  data.driveId;
-                        _this.networkId = network_data.id;
-                        _this.networkTcpInfo = network_data.networkUrls != null ? network_data.networkUrls.tcp : null;
-                        _this.isStarted = true;
-                        _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                        deferred.resolve();
-                    })
-                },
-                function (xhr2) {
-                    _this._onFatalError($.parseJSON(xhr.responseText));
-                    deferred.reject();
-                });
-        return deferred.promise();
-    }
-
     this.startDockerEnvironment = function (environmentId, args) {
         var data = {};
         data.type = "container";
@@ -748,68 +737,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         return deferred.promise();
     };
-
-  
-    this.startConnectedEnvironments = function (environmentId1, environmentId2, args) {
-        var data = {};
-        data.type = "machine";
-        data.environment = environmentId1;
-
-        if (typeof args !== "undefined") {
-            data.keyboardLayout = args.keyboardLayout;
-            data.keyboardModel = args.keyboardModel;
-            data.object = args.object;
-
-            if (args.object == null) {
-                data.software = args.software;
-            }
-            data.userId = args.userId;
-        }
-        var deferred = $.Deferred();
-
-        console.log("Starting environment " + environmentId1 + "...");
-        $.ajax({
-            type: "POST",
-            url: API_URL + "/components",
-            data: JSON.stringify(data),
-            contentType: "application/json"
-        }).then(function (data1, status1, xhr1) {
-                console.log("Environment " + environmentId1 + " started.");
-                data.environment = environmentId2;
-                $.ajax({
-                    type: "POST",
-                    url: API_URL + "/components",
-                    data: JSON.stringify(data),
-                    contentType: "application/json"
-                }).then(function (data2, status2, xhr2) {
-                    $.ajax({
-                        type: "POST",
-                        url: API_URL + "/networks",
-                        data: JSON.stringify({
-                            components: [
-                                {componentId: data1.id},
-                                {componentId: data2.id}
-                            ],
-                            hasInternet: false
-                        }),
-                        contentType: "application/json"
-                    }).then(function (network_data, status3, xhr3) {
-                        _this.componentId = data1.id;
-                        _this.driveId = data1.driveId;
-                        _this.networkId = network_data.id;
-                        _this.componentId2 = data2.id;
-                        _this.isStarted = true;
-                        _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                        deferred.resolve();
-                    })
-                })
-            },
-            function (xhr2) {
-                _this._onFatalError($.parseJSON(xhr.responseText));
-                deferred.reject();
-            });
-        return deferred.promise();
-    }
+    
 };
 /*
  *  Example usage:
