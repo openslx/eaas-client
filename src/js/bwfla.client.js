@@ -65,8 +65,13 @@ EaasClient.Client = function (api_entrypoint, container) {
     var emulatorState;
 
     this.pollState = function () {
-        $.get(API_URL + formatStr("/components/{0}/state", _this.componentId))
-            .then(function (data, status, xhr) {
+
+        $.ajax({
+            type: "GET",
+            url: API_URL + formatStr("/components/{0}/state", _this.componentId),
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
+            async: false,
+        }).then(function (data, status, xhr) {
                 emulatorState = data.state;
                 if (emulatorState == "OK")
                     _this.keepalive();
@@ -113,15 +118,23 @@ EaasClient.Client = function (api_entrypoint, container) {
             if (typeof _this.envsComponentsData != "undefined"){
                 //FIXME we should send only one keepalive
                 for (let i = 0; i < _this.envsComponentsData.length; i++) {
-                    url = formatStr("/components/{0}/keepalive", _this.envsComponentsData[i].id);
-                    $.post(API_URL + url);
+                     $.ajax({
+                        type: "POST",
+                        url: API_URL + formatStr("/components/{0}/keepalive", _this.envsComponentsData[i].id),
+                        headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
+                     });
                 }
             }
             url = formatStr("/networks/{0}/keepalive", _this.networkId);
         } else if (_this.componentId != null) {
             url = formatStr("/components/{0}/keepalive", _this.componentId);
         }
-        $.post(API_URL + url);
+
+        $.ajax({
+           type: "POST",
+           url: API_URL + url,
+           headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
+        });
     };
 
     this.establishGuacamoleTunnel = function (controlUrl) {
@@ -208,7 +221,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         var data = {};
         data.type = "container";
         data.environment = containerId;
-	data.input_data = args.input_data;
+	    data.input_data = args.input_data;
 
         console.log("Starting container " + containerId + "...");
         var deferred = $.Deferred();
@@ -216,20 +229,20 @@ EaasClient.Client = function (api_entrypoint, container) {
         $.ajax({
             type: "POST",
             url: API_URL + "/components",
-                data: JSON.stringify(data),
-                contentType: "application/json"
-        })
-            .then(function (data, status, xhr) {
-                console.log("container " + containerId + " started.");
-                _this.componentId = data.id;
-                _this.isStarted = true;
-                _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                deferred.resolve();
-            },
-            function (xhr) {
-                _this._onFatalError($.parseJSON(xhr.responseText));
-                deferred.reject();
-            });
+            data: JSON.stringify(data),
+            contentType: "application/json",
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
+        }).then(function (data, status, xhr) {
+            console.log("container " + containerId + " started.");
+            _this.componentId = data.id;
+            _this.isStarted = true;
+            _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+            deferred.resolve();
+        },
+        function (xhr) {
+            _this._onFatalError($.parseJSON(xhr.responseText));
+            deferred.reject();
+        });
         return deferred.promise();
     };
 
@@ -296,7 +309,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                     // hasTcpGateway: args.hasTcpGateway ? true : false,
                     // tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
                 }),
-                contentType: "application/json"
+                contentType: "application/json",
+                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
             }).then(function (network_data, status, xhr) {
                     _this.envsComponentsData = envsComponentsData;
                     _this.networkId = network_data.id;
@@ -319,6 +333,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 $.ajax({
                     type: "POST",
                     url: API_URL + "/components",
+                    headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
                     success: function (envData, status2, xhr2) {
                         idsData.push(envData);
                         if(environments[i].visualize == true){
@@ -347,7 +362,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                 type: "POST",
                 url: API_URL + "/components",
                 data: JSON.stringify(environments[0].data),
-                contentType: "application/json"
+                contentType: "application/json",
+                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
             })
                 .then(function (data, status, xhr) {
                         _this.componentId = data.id;
@@ -410,8 +426,13 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
 
         console.log("Connecting viewer...");
-        $.get(API_URL + formatStr("/components/{0}/controlurls", _this.componentId))
-            .done(function (data, status, xhr) {
+
+        $.ajax({
+            type: "GET",
+            url: API_URL + formatStr("/components/{0}/controlurls", _this.componentId),
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
+            async: false,
+        }).done(function (data, status, xhr) {
                 var connectViewerFunc;
                 var controlUrl;
 
@@ -490,7 +511,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
             timeout: 30000,
 			contentType: "application/json",
-			data: JSON.stringify(request)
+			data: JSON.stringify(request),
+			headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
         })
             .done(function (data, status, xhr) {
                 var envid = data.envId;
@@ -522,12 +544,16 @@ EaasClient.Client = function (api_entrypoint, container) {
     }
 
     this.getPrintJobs = function (successFn, errorFn) {
-        $.get(API_URL + formatStr("/components/{0}/printJobs", _this.componentId))
-            .done(function (data, status, xhr) {
-                successFn(data);
-            }).fail(function (xhr) {
-            if(errorFn)
-                errorFn(xhr);
+        $.ajax({
+            type: "GET",
+            url: API_URL + formatStr("/components/{0}/printJobs", _this.componentId),
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
+            async: false,
+        }).done(function (data, status, xhr) {
+            successFn(data);
+        }).fail(function (xhr) {
+        if(errorFn)
+            errorFn(xhr);
         });
     };
 
@@ -550,6 +576,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         $.ajax({
             type: "GET",
             url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
             async: false,
         });
 
@@ -574,6 +601,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         $.ajax({
             type: "DELETE",
             url: API_URL + formatStr("/components/{0}", _this.componentId),
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
             async: false,
         });
     };
@@ -592,7 +620,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             type: "POST",
             url: API_URL + formatStr("/components/{0}/snapshot", _this.componentId),
             data: JSON.stringify(postObj),
-            contentType: "application/json"
+            contentType: "application/json",
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
         }).then(function (data, status, xhr) {
             onChangeDone(data, status);
         }).fail(function(xhr, textStatus, error) {
@@ -611,7 +640,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             type: "POST",
             url: API_URL + formatStr("/components/{0}/changeMedia", _this.componentId),
             data: JSON.stringify(postObj),
-            contentType: "application/json"
+            contentType: "application/json",
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
         }).then(function (data, status, xhr) {
             onChangeDone(data, status);
         });
@@ -708,7 +738,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             type: "POST",
             url: API_URL + "/components",
             data: JSON.stringify(data),
-            contentType: "application/json"
+            contentType: "application/json",
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
         })
             .then(function (data, status, xhr) {
                     console.log("Environment " + environmentId + " started.");
