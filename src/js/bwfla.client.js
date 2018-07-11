@@ -59,6 +59,31 @@ EaasClient.Client = function (api_entrypoint, container) {
         return result;
     }
 
+    async function removeNetworkComponent(netid, compid) {
+        console.log("Removing component " + compid + " from network " + netid);
+        try {
+            await $.ajax({
+                type: "DELETE",
+                url: API_URL + formatStr("/networks/{0}/components/{1}", netid, compid),
+                timeout: 10000,
+                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
+            });
+        }
+        catch (xhr) {
+            const json = $.parseJSON(xhr.responseText);
+            if (json.error !== null)
+                console.error("Server-Error:" + json.error);
+            if (json.detail !== null)
+                console.error("Server-Error Details:" + json.detail);
+            if (json.stacktrace !== null)
+                console.error("Server-Error Stacktrace:" + json.stacktrace);
+
+            console.error("Removing component failed!");
+            throw undefined;
+        }
+
+        console.log("Component removed: " + compid);
+    }
 
     var isStarted = false;
     var isConnected = false;
@@ -304,7 +329,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 type: "POST",
                 url: API_URL + "/networks",
                 data: JSON.stringify({
-                    components,
+                    components: components,
                     hasInternet: args.hasInternet ? true : false,
                     // hasTcpGateway: args.hasTcpGateway ? true : false,
                     // tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
@@ -370,7 +395,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                         _this.driveId = data.driveId;
 
                         if (args.tcpGatewayConfig || args.hasInternet) {
-                            connectNetwork(data);
+                            connectNetwork([data]);
                         } else {
                             console.log("Environment " + environments[0].data.environment + " started.");
                             _this.isStarted = true;
@@ -496,42 +521,40 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     // Checkpoints a running session
-    this.checkpoint = function (request) {
-        var deferred = $.Deferred();
-
+    this.checkpoint = async function (request) {
         if (!this.isStarted) {
             _this._onFatalError("Environment was not started properly!");
-            deferred.reject();
-            return deferred.promise();
+            throw undefined;
+        }
+
+        if (_this.networkId != null) {
+            // Remove the main component from the network group first!
+            await removeNetworkComponent(_this.networkId, _this.componentId);
         }
 
         console.log("Checkpointing session...");
-        $.ajax({
-            type: "POST",
-            url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
-            timeout: 30000,
-			contentType: "application/json",
-			data: JSON.stringify(request),
-			headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        })
-            .done(function (data, status, xhr) {
-                var envid = data.envId;
-                console.log("Checkpoint created: " + envid);
-                deferred.resolve(envid);
-            })
-            .fail(function (xhr, status, error) {
-                var json = $.parseJSON(xhr.responseText);
-                if (json.message !== null)
-                    console.error("Server-Error:" + json.message);
-
-                if (error !== null)
-                    console.error("Ajax-Error: " + error);
-
-                console.error("Checkpointing failed!");
-                deferred.reject();
+        try {
+            const data = await $.ajax({
+                type: "POST",
+                url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
+                timeout: 30000,
+                contentType: "application/json",
+                data: JSON.stringify(request),
+                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
             });
 
-        return deferred.promise();
+            const envid = data.envId;
+            console.log("Checkpoint created: " + envid);
+            return envid;
+        }
+        catch (xhr) {
+            var json = $.parseJSON(xhr.responseText);
+            if (json.message !== null)
+                console.error("Server-Error:" + json.message);
+
+            console.error("Checkpointing failed!");
+            throw undefined;
+        }
     };
 
     this.getScreenshotUrl = function () {
