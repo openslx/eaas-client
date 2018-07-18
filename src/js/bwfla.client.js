@@ -331,8 +331,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data: JSON.stringify({
                     components: components,
                     hasInternet: args.hasInternet ? true : false,
-                    // hasTcpGateway: args.hasTcpGateway ? true : false,
-                    // tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
+                    hasTcpGateway: args.hasTcpGateway ? true : false,
+                    tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
                 }),
                 contentType: "application/json",
                 headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
