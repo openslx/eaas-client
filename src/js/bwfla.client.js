@@ -6,8 +6,11 @@ var EaasClient = EaasClient || {};
 
 EaasClient.Client = function (api_entrypoint, container) {
 
+
+
     // Clean up on window close
     window.onbeforeunload = function () {
+        if(_this.deleteOnUnload)
         this.release();
     }.bind(this);
 
@@ -29,6 +32,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     var _this = this;
+    _this.deleteOnUnload = true;
     var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
 
     this.componentId = null;
