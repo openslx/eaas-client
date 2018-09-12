@@ -242,8 +242,11 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.getContainerResultUrl = function()
     {
         console.log(_this.componentId);
+        if(_this.componentId == null){
+            this.onError("Component ID is null, please contact administrator");
+        }
         return API_URL + formatStr("/components/{0}/result", _this.componentId);
-    }
+    };
 
     this.startContainer = function(containerId, args)
     {
