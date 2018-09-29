@@ -729,6 +729,7 @@ EaasClient.Client = function (api_entrypoint, container) {
          search for eaas-client.js path, in order to include it to filePath
          */
         var scripts = document.getElementsByTagName("script");
+        var eaasClientPath = "";
         for (var prop in scripts) {
             var searchingAim = "eaas-client.js";
             if (typeof(scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
