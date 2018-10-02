@@ -8,7 +8,123 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
     var cdebug = console.debug;
     var clog = console.log;
 
+    XpraClient.prototype.init_state = function (container) {
+        this.desktop_width = 0;
+        this.desktop_height = 0;
+        this.server_remote_logging = false;
+        this.capabilities = {};
+        this.RGB_FORMATS = ["RGBX", "RGBA"];
+        this.disconnect_reason = null;
+        this.audio_enabled = false;
+        this.audio_mediasource_enabled = MediaSourceUtil.getMediaSourceClass() != null;
+        this.audio_aurora_enabled = typeof AV !== "undefined" && AV != null && AV.Decoder != null && AV.Player.fromXpraSource != null;
+        this.audio_httpstream_enabled = true;
+        this.audio_codecs = {};
+        this.audio_framework = null;
+        this.audio_aurora_ctx = null;
+        this.audio_codec = null;
+        this.audio_context = Utilities.getAudioContext();
+        this.aurora_codecs = {};
+        this.mediasource_codecs = {};
+        this.encryption = false;
+        this.encryption_key = null;
+        this.cipher_in_caps = null;
+        this.cipher_out_caps = null;
+        this.browser_language = Utilities.getFirstBrowserLanguage();
+        this.browser_language_change_embargo_time = 0;
+        this.key_layout = null;
+        this.mousedown_event = null;
+        this.last_mouse_x = null;
+        this.last_mouse_y = null;
+        this.wheel_delta_x = 0;
+        this.wheel_delta_y = 0;
+        this.clipboard_buffer = "";
+        this.clipboard_pending = false;
+        this.clipboard_targets = ["UTF8_STRING", "TEXT", "STRING", "text/plain"];
+        this.remote_printing = false;
+        this.remote_file_transfer = false;
+        this.remote_open_files = false;
+        this.hello_timer = null;
+        this.ping_timeout_timer = null;
+        this.ping_grace_timer = null;
+        this.ping_timer = null;
+        this.last_ping_server_time = 0;
+        this.last_ping_local_time = 0;
+        this.last_ping_echoed_time = 0;
+        this.server_ok = false;
+        this.queue_draw_packets = false;
+        this.dQ = [];
+        this.dQ_interval_id = null;
+        this.process_interval = 4;
+        this.server_resize_exact = false;
+        this.server_screen_sizes = [];
+        this.server_is_desktop = false;
+        this.server_connection_data = false;
+        this.id_to_window = {};
+        this.ui_events = 0;
+        this.pending_redraw = [];
+        this.draw_pending = 0;
+        this.topwindow = null;
+        this.topindex = 0;
+        this.focus = -1;
+        jQuery("#emulator-container").mousedown(function (e) {
+            me.on_mousedown(e)
+        });
+        jQuery("#emulator-container").mouseup(function (e) {
+            me.on_mouseup(e)
+        });
+        jQuery("#emulator-container").mousemove(function (e) {
+            me.on_mousemove(e)
+        });
+        var me = this;
+        var div = document.getElementById("emulator-container");
+
+        function on_mousescroll(e) {
+            me.on_mousescroll(e)
+        }
+
+        if (Utilities.isEventSupported("wheel")) {
+            div.addEventListener("wheel", on_mousescroll, false)
+        } else if (Utilities.isEventSupported("mousewheel")) {
+            div.addEventListener("mousewheel", on_mousescroll, false)
+        } else if (Utilities.isEventSupported("DOMMouseScroll")) {
+            div.addEventListener("DOMMouseScroll", on_mousescroll, false)
+        }
+    };
+
+    XpraClient.prototype.getMouse = function (e, window) {
+        var mx = e.clientX + jQuery(document).scrollLeft();
+        var my = e.clientY + jQuery(document).scrollTop();
+        if (isNaN(mx) || isNaN(my)) {
+            if (!isNaN(this.last_mouse_x) && !isNaN(this.last_mouse_y)) {
+                mx = this.last_mouse_x;
+                my = this.last_mouse_y
+            } else {
+                mx = 0;
+                my = 0
+            }
+        } else {
+            this.last_mouse_x = mx;
+            this.last_mouse_y = my
+        }
+        var mbutton = 0;
+        if ("which" in e) mbutton = Math.max(0, e.which); else if ("button" in e) mbutton = Math.max(0, e.button) + 1;
+        if (window && this.server_is_desktop) {
+            var pos = jQuery(window.div).position();
+            mx -= pos.left;
+            my -= pos.top
+        }
+
+
+        var offset = $("#emulator-container").offset();
+        mx = mx - offset.left;
+        my = my - offset.top;
+
+        return {x: mx, y: my, button: mbutton}
+    };
+
     function init_client() {
+
         if (typeof jQuery == 'undefined') {
             window.alert("Incomplete Xpra HTML5 client installation: jQuery is missing, cannot continue.");
             return;
@@ -26,7 +142,8 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             var audio_codec = getparam("audio_codec") || "legacy:wav";
         } else
             var audio_codec = getparam("audio_codec") || null;
-        var encoding = getparam("encoding") || null;
+        var encoding = "jpeg";
+        var encoding = "jpeg";
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
         var submit = getboolparam("submit", true);
@@ -98,8 +215,11 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
 
         // create the client
         var client = new XpraClient('emulator-container');
+        client.div = 'emulator-container';
         client.steal = false;
-        client.debug = debug;
+        client.debug = function () {
+
+        };
         client.remote_logging = remote_logging;
         client.sharing = sharing;
         client.insecure = insecure;
@@ -371,11 +491,49 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
 
     $(document).ready(function() {
         var client = init_client();
+        clog = function() {
+            client.log.apply(client, arguments);
+        }
+        cdebug = function() {
+            client.debug.apply(client, arguments);
+        }
+        client.on_audio_state_change = function(newstate, details) {
+            var tooltip = "";
+            var image_name = "";
+            if (newstate=="playing") {
+                image_name = "speaker.png";
+                tooltip = details || "playing";
+            }
+            else if (newstate=="waiting") {
+                image_name = "speaker-buffering.png";
+                tooltip = details || "buffering";
+            }
+            else {
+                image_name = "speaker-off.png";
+                tooltip = details || "off";
+            }
+            clog("audio-state:", newstate);
+            $("#speaker_icon").attr("src", "./icons/"+image_name);
+            $("#speaker_icon").attr("title", tooltip);
+        };
+        document.addEventListener("visibilitychange", function (e) {
+            window_ids = Object.keys(client.id_to_window).map(Number);
+            clog("visibilitychange hidden=", document.hidden);
+            if (document.hidden) {
+                client.send(["suspend", true, window_ids]);
+            }
+            else {
+                client.send(["resume", true, window_ids]);
+                client.redraw_windows();
+                client.request_refresh(-1);
+            }
+        });
+
+
 
         /**
          * Client PATCH
          */
-
 
         client.connect = function() {
             var details = this.host + ":" + this.port;
@@ -464,24 +622,17 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             y = 0;
             // create the XpraWindow object to own the new div
 
-            var win = new XpraWindow(this, mycanvas, wid, x, y, w, h,
-                metadata,
-                override_redirect,
-                client_properties,
-                this._window_geometry_changed,
-                this._window_mouse_move,
-                this._window_mouse_click,
-                this._window_set_focus,
-                this._window_closed
-            );
+            var win = new XpraWindow(this, mycanvas, wid, x, y, w, h, metadata, override_redirect, false, client_properties, client._window_geometry_changed, client._window_mouse_move, client._window_mouse_down, client._window_mouse_up, client._window_mouse_scroll, client._window_set_focus, client._window_closed);
+            client.id_to_window[wid] = win;
+
             win.debug = this.debug;
             win._set_decorated(false);
             win.updateCSSGeometry();
             this.id_to_window[wid] = win;
             if (!override_redirect) {
                 var geom = win.get_internal_geometry();
-                this.send(["map-window", wid, geom.x, geom.y, geom.w, geom.h, this._get_client_properties(win)]);
-                this._window_set_focus(win);
+                client.send(["map-window", wid, geom.x, geom.y, geom.w, geom.h, this._get_client_properties(win)]);
+                client._window_set_focus(win);
             }
         };
 
@@ -556,50 +707,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             jQuery(this.div).css('z-index', 1000);
         }
 
-        XpraWindow.prototype.getMouse = function(e) {
-            //var eaas_offset_y = 20; // the size of the top frame (which we deleted for our eaas usecase)
-            // get mouse position take into account scroll
-            var mx = e.clientX + jQuery(document).scrollLeft();
-            var my = e.clientY + jQuery(document).scrollTop();
 
-            // check last mouse position incase the event
-            // hasn't provided it - bug #854
-            if(isNaN(mx) || isNaN(my)) {
-                if(!isNaN(this.last_mouse_x) && !isNaN(this.last_mouse_y)) {
-                    mx = this.last_mouse_x;
-                    my = this.last_mouse_y;
-                } else {
-                    // should we avoid sending NaN to the server?
-                    mx = 0;
-                    my = 0;
-                }
-            } else {
-                this.last_mouse_x = mx;
-                this.last_mouse_y = my;
-            }
-
-            var mbutton = 0;
-            if ("which" in e)  // Gecko (Firefox), WebKit (Safari/Chrome) & Opera
-                mbutton = Math.max(0, e.which);
-            else if ("button" in e)  // IE, Opera (zero based)
-                mbutton = Math.max(0, e.button)+1;
-            //show("getmouse: button="+mbutton+", which="+e.which+", button="+e.button);
-
-            if (this.client.server_is_desktop) {
-                //substract window offset since the desktop's top-left corner should be at 0,0:
-                var pos = jQuery(this.div).position()
-                mx -= pos.left;
-                my -= pos.top;
-            }
-
-            // We return a simple javascript object (a hash) with x and y defined
-
-            var offset = $("#emulator-container").offset();
-            mx = mx - offset.left;
-            my = my - offset.top //+ eaas_offset_y
-            ;
-            return {x: mx, y: my, button: mbutton};
-        };
     });
 
     XpraClient.prototype.init_keyboard = function() {
@@ -639,6 +747,10 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         });
 
     };
+
+
+
+
     MediaSourceUtil.getMediaSourceAudioCodecs = function(ignore_blacklist) {
         var media_source_class = MediaSourceUtil.getMediaSourceClass();
         if(!media_source_class) {
