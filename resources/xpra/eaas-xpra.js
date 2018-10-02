@@ -135,14 +135,15 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         var username = getparam("username") || null;
         var password = getparam("password") || null;
         var sound = true;
-        if (Utilities.isFirefox() || Utilities.isChrome()) {
+        if (Utilities.isChrome()) {
             // var audio_codec = getparam("audio_codec") || "http-stream:mp3";
             var audio_codec = getparam("audio_codec") || "mediasource:opus+mka";
-        } else if(Utilities.isSafari()){
+        } else if (Utilities.isSafari()) {
             var audio_codec = getparam("audio_codec") || "legacy:wav";
-        } else
-            var audio_codec = getparam("audio_codec") || null;
-        var encoding = "jpeg";
+        } else if (Utilities.isFirefox())
+            var audio_codec = getparam("audio_codec") || "legacy:wav"; //temporary
+        else
+            var audio_codec = null;
         var encoding = "jpeg";
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
