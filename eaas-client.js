@@ -325,6 +325,7 @@ EaasClient.Client = function (api_entrypoint, container) {
      * @returns {*}
      */
     this.start = function (environments, args) {
+        this.tcpGatewayConfig = args.tcpGatewayConfig;
 
         var connectNetwork = function (envsComponentsData) {
             components = [];
@@ -472,6 +473,10 @@ EaasClient.Client = function (api_entrypoint, container) {
                 var connectViewerFunc;
                 var controlUrl;
 
+                // Get the first ws+ethernet connector
+                const entries = Object.entries(data).filter(([k]) => k.match(/^ws\+ethernet\+/));
+                if (entries.length) _this.ethernetURL = entries[0][1];
+
                 // Guacamole connector?
                 if (typeof data.guacamole !== "undefined") {
                     controlUrl = data.guacamole;
@@ -509,6 +514,23 @@ EaasClient.Client = function (api_entrypoint, container) {
             });
 
         return deferred.promise();
+    };
+
+    this.getProxyURL = function ({
+        tcpGatewayConfig: config = this.tcpGatewayConfig,
+        localPort = "8080",
+        localIP = "127.0.0.1",
+    } = {}) {
+        const eaasURL = new URL("web+eaas-proxy:");
+        eaasURL.search = encodeURIComponent(JSON.stringify([
+            `${localIP}:${localPort}`,
+            this.ethernetURL,
+            "",
+            `${config.gwPrivateIp}/${config.gwPrivateMask}`,
+            config.serverIp,
+            config.serverPort,
+        ]));
+        return String(eaasURL);
     };
 
     // Disconnects viewer from a running session
