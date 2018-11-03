@@ -166,6 +166,21 @@ EaasClient.Client = function (api_entrypoint, container) {
         });
     };
 
+    this.wsConnection = function () {
+        if (_this.networkId == null) {
+            return null;
+        }
+
+        url = formatStr("/networks/{0}/wsConnection", _this.networkId);
+        $.ajax({
+            type: "GET",
+            url: API_URL + url,
+            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
+        }).done(function (data, status, xhr) {
+            console.log(data);
+        });
+    }
+
     this.establishGuacamoleTunnel = function (controlUrl) {
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX, y = window.scrollY;
