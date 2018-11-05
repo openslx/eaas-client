@@ -166,19 +166,16 @@ EaasClient.Client = function (api_entrypoint, container) {
         });
     };
 
-    this.wsConnection = function () {
+    this.wsConnection = async function () {
         if (_this.networkId == null) {
             return null;
         }
 
-        url = formatStr("/networks/{0}/wsConnection", _this.networkId);
-        $.ajax({
-            type: "GET",
-            url: API_URL + url,
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        }).done(function (data, status, xhr) {
-            console.log(data);
+        const url = `${API_URL}/networks/${this.networkId}/wsConnection`;
+        const res = await fetch(url, {headers:
+            localStorage.id_token ? {"authorization" : `Bearer ${localStorage.id_token}`} : {},
         });
+        return await res.text();
     }
 
     this.establishGuacamoleTunnel = function (controlUrl) {
