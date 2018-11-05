@@ -530,7 +530,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
-    this.getProxyURL = function ({
+    this.getProxyURL = async function ({
         tcpGatewayConfig: config = this.tcpGatewayConfig,
         localPort = "8080",
         localIP = "127.0.0.1",
@@ -538,7 +538,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         const eaasURL = new URL("web+eaas-proxy:");
         eaasURL.search = encodeURIComponent(JSON.stringify([
             `${localIP}:${localPort}`,
-            this.ethernetURL,
+            await this.wsConnection(),
             "",
             `${config.gwPrivateIp}/${config.gwPrivateMask}`,
             config.serverIp,
