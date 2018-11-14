@@ -342,7 +342,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         this.tcpGatewayConfig = args.tcpGatewayConfig;
 
         var connectNetwork = function (envsComponentsData) {
-            components = [];
+            const components = [];
             for (let i = 0; i < envsComponentsData.length; i++) {
                 components.push({componentId: envsComponentsData[i].id});
             }
