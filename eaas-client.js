@@ -99,7 +99,6 @@ EaasClient.Client = function (api_entrypoint, container) {
             type: "GET",
             url: API_URL + formatStr("/components/{0}/state", _this.componentId),
             headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-            async: false,
         }).then(function (data, status, xhr) {
                 emulatorState = data.state;
                 if (emulatorState == "OK")
