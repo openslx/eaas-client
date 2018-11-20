@@ -529,6 +529,35 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
+    this.detach = async function (detachTime_minutes) {
+        const res = await fetch(`${API_URL}/sessions`, {
+            method: "POST",
+            headers: {
+                "content-type": "application/json",
+            },
+            body: JSON.stringify({
+                lifetime: detachTime_minutes,
+                lifetime_unit: "minutes",
+                resources: [
+                    {
+                        id: this.networkId,
+                        type: "component",
+                        keepalive_url: `${API_URL}/components/${this.componentId}/keepalive`,
+                    },
+                    {
+                        id: this.componentId,
+                        type: "network",
+                        keepalive_url: `${API_URL}/networks/${this.networkId}/keepalive`,
+                    }
+                ],
+            }),
+        });
+        if (res.status !== 200) {
+            throw new Error("Session cannot be detached!");
+        }
+        window.onbeforeunload = () => void this.disconnect();
+    };
+
     this.getProxyURL = async function ({
         tcpGatewayConfig: config = this.tcpGatewayConfig,
         localPort = "8080",
