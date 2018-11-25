@@ -36,7 +36,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
 
     this.componentId = null;
-    this.componentId2 = null;
+    this.eventSource = null;
     this.networkTcpInfo = null;
     this.networkId = null;
     this.driveId = null;
@@ -384,10 +384,13 @@ EaasClient.Client = function (api_entrypoint, container) {
                         idsData.push(envData);
                         if(environments[i].visualize == true){
                             console.log("_this.componentId "+ _this.componentId);
-                            if(_this.componentId != null)
+                            if(_this.componentId != null) {
                                 console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
+                                return;
+                            }
                             _this.componentId = envData.id;
                             _this.driveId = envData.driveId;
+                            _this.eventSource = new EventSource(API_RUL + "/components/" + _envData.id + "/events");
                         }
                     },
                     async:false,
@@ -414,6 +417,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 .then(function (data, status, xhr) {
                         _this.componentId = data.id;
                         _this.driveId = data.driveId;
+                        _this.eventSource = new EventSource(API_URL + "/components/" + data.id + "/events");
 
                         if (args.tcpGatewayConfig || args.hasInternet) {
                             connectNetwork([data]);
