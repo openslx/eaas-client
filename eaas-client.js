@@ -390,7 +390,10 @@ EaasClient.Client = function (api_entrypoint, container) {
                             }
                             _this.componentId = envData.id;
                             _this.driveId = envData.driveId;
-                            _this.eventSource = new EventSource(API_RUL + "/components/" + _envData.id + "/events");
+                            var eventUrl = API_RUL + "/components/" + _envData.id + "/events";
+                            if(localStorage.getItem('id_token'))
+                                eventUrl += "?access_token="+ localStorage.getItem('id_token');
+                            _this.eventSource = new EventSource(eventUrl);
                         }
                     },
                     async:false,
@@ -417,7 +420,11 @@ EaasClient.Client = function (api_entrypoint, container) {
                 .then(function (data, status, xhr) {
                         _this.componentId = data.id;
                         _this.driveId = data.driveId;
-                        _this.eventSource = new EventSource(API_URL + "/components/" + data.id + "/events");
+
+                        var eventUrl = API_URL + "/components/" + data.id + "/events";
+                        if(localStorage.getItem('id_token'))
+                            eventUrl += "?access_token="+ localStorage.getItem('id_token');
+                        _this.eventSource = new EventSource(eventUrl);
 
                         if (args.tcpGatewayConfig || args.hasInternet) {
                             connectNetwork([data]);
