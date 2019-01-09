@@ -41,6 +41,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.networkId = null;
     this.driveId = null;
     this.params = null;
+    this.mode = null;
 
     // ID for registered this.pollState() with setInterval()
     this.pollStateIntervalId = null;
@@ -506,12 +507,14 @@ EaasClient.Client = function (api_entrypoint, container) {
                     controlUrl = data.guacamole;
                     _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
                     connectViewerFunc = _this.establishGuacamoleTunnel;
+                    _this.mode = "guac";
                 }
                 // XPRA connector
                 else if (typeof data.xpra !== "undefined") {
                     controlUrl = data.xpra;
                     _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadXpra;
+                    _this.mode = "xpra";
                 }
                 // WebEmulator connector
                 else if (typeof data.webemulator !== "undefined") {
