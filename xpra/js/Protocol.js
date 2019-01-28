@@ -1,14 +1,3 @@
-if (!self.setImmediate) {
-    const handlers = [];
-    const {port1, port2} = new MessageChannel();
-    port2.onmessage = () => handlers.shift()();
-
-    self.setImmediate = (handler, ...args) => {
-      handlers.push(() => handler(...args));
-      port1.postMessage(undefined);
-    }
-}
-
 function XpraProtocolWorkerHost() {
     this.worker = null;
     this.packet_handler = null;
@@ -271,7 +260,6 @@ XpraProtocol.prototype.process_receive_queue = function () {
             console.error("error processing packet " + e)
         }
     }
-    if (this.rQ.length > 0) setImmediate(() => this.process_receive_queue());
 };
 XpraProtocol.prototype.process_send_queue = function () {
     while (this.sQ.length !== 0 && this.websocket) {

@@ -682,7 +682,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                 this.worker.postMessage({'c': 'o', 'u': uri});
                 return;
             }
-            this.worker = new Worker(xpraPath + 'js/Protocol.js');
+            this.worker = new Worker(xpraPath + 'eaas-xpra-worker.js');
             this.worker.addEventListener('message', function(e) {
                 var data = e.data;
                 switch (data.c) {
