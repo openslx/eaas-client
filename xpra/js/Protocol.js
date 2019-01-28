@@ -260,6 +260,10 @@ XpraProtocol.prototype.process_receive_queue = function () {
             console.error("error processing packet " + e)
         }
     }
+    if (this.rQ.length > 0) {
+        console.debug(`Remaining this.rQ.length: ${this.rQ.length}`);
+        setTimeout(() => this.process_receive_queue(), this.process_interval);
+    }
 };
 XpraProtocol.prototype.process_send_queue = function () {
     while (this.sQ.length !== 0 && this.websocket) {
