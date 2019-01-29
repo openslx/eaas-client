@@ -20,6 +20,6 @@ if (!self.setImmediate) {
 XpraProtocol.prototype.process_receive_queue = new Proxy(XpraProtocol.prototype.process_receive_queue, {
     apply(target, thisArgument, argumentsList) {
         Reflect.apply(target, thisArgument, argumentsList);
-        if (thisArgument.rQ.length > 0) setImmediate(() => thisArgument.process_receive_queue());
+        if (thisArgument.rQ.length > 0) thisArgument.process_receive_queue();
     },
-})
+});
