@@ -1,0 +1,20 @@
+#!/bin/sh
+
+PORT=8090
+
+# trap "kill 0" EXIT
+trap "pkill -P $$" EXIT
+
+echo "file://$(cd -- "$(dirname -- "$0")"; pwd)/test-xpra.html"
+echo
+echo 'https://xpra.org/html5/connect.html?server=localhost&port='"$PORT"'&ssl=false'
+echo
+
+xpra start --start=xterm --terminate-children=yes --daemon=off --bind="$(pwd)"/xpra.sock &
+
+websockify 127.0.0.1:"$PORT" --unix-target="$(pwd)"/xpra.sock &
+
+# npm install websocket-stream
+# node -e 'require("websocket-stream").createServer({port: 8090}, ws => ws.pipe(require("net").connect("./xpra.sock")).pipe(ws))' &
+
+while ! wait; do :; done
