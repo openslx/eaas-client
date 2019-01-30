@@ -17,9 +17,22 @@ if (!self.setImmediate) {
     }
 }
 
+/*
+{
+    const target = XpraProtocol.prototype.process_receive_queue;
+    XpraProtocol.prototype.process_receive_queue = function (...argumentsList) {
+        const thisArgument = this;
+        do {
+            Reflect.apply(target, thisArgument, argumentsList);
+        } while (thisArgument.rQ.length > 0 && thisArgument.header.length === 0);
+    }
+}
+*/
+
 XpraProtocol.prototype.process_receive_queue = new Proxy(XpraProtocol.prototype.process_receive_queue, {
     apply(target, thisArgument, argumentsList) {
-        Reflect.apply(target, thisArgument, argumentsList);
-        if (thisArgument.rQ.length > 0) thisArgument.process_receive_queue();
+        do {
+            Reflect.apply(target, thisArgument, argumentsList);
+        } while (thisArgument.rQ.length > 0 && thisArgument.header.length === 0);
     },
 });
