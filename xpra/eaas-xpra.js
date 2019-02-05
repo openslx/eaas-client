@@ -55,7 +55,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         this.queue_draw_packets = false;
         this.dQ = [];
         this.dQ_interval_id = null;
-        this.process_interval = 4;
+        this.process_interval = 0;
         this.server_resize_exact = false;
         this.server_screen_sizes = [];
         this.server_is_desktop = false;
@@ -682,7 +682,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
                 this.worker.postMessage({'c': 'o', 'u': uri});
                 return;
             }
-            this.worker = new Worker(xpraPath + 'js/Protocol.js');
+            this.worker = new Worker(xpraPath + 'eaas-xpra-worker.js');
             this.worker.addEventListener('message', function(e) {
                 var data = e.data;
                 switch (data.c) {
