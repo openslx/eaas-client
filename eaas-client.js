@@ -691,6 +691,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
             async: false,
         });
+        _this.eventSource.close();
 
         this.isStarted = false;
 
