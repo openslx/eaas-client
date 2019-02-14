@@ -141,7 +141,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         } else if (Utilities.isSafari()) {
             var audio_codec = getparam("audio_codec") || "legacy:wav";
         } else if (Utilities.isFirefox())
-            var audio_codec = getparam("audio_codec") || "legacy:wav"; //temporary
+            var audio_codec = getparam("audio_codec") || "mediasource:opus+mka"; //temporary
         else
             var audio_codec = null;
         var encoding = "png";
