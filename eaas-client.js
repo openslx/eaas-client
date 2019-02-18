@@ -19,7 +19,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         xpraWidth: 640,
         xpraHeight: 480,
         xpraDPI: 96,
-        xpraEncoding: "rgb32"
+        xpraEncoding: "jpeg"
     };
 
     this.setXpraConf = function (width, height, dpi, xpraEncoding) {
@@ -340,6 +340,8 @@ EaasClient.Client = function (api_entrypoint, container) {
      */
     this.start = function (environments, args) {
         this.tcpGatewayConfig = args.tcpGatewayConfig;
+        if (typeof args.encoding != "undefined")
+            _this.xpraConf.xpraEncoding = args.encoding;
 
         var connectNetwork = function (envsComponentsData) {
             const components = [];

@@ -144,7 +144,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             var audio_codec = getparam("audio_codec") || "legacy:wav"; //temporary
         else
             var audio_codec = null;
-        var encoding = "jpeg";
+        var encoding = xpraConf.xpraEncoding;
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
         var submit = getboolparam("submit", true);
