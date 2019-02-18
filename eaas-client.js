@@ -340,8 +340,8 @@ EaasClient.Client = function (api_entrypoint, container) {
      */
     this.start = function (environments, args) {
         this.tcpGatewayConfig = args.tcpGatewayConfig;
-        if (typeof args.encoding != "undefined")
-            _this.xpraConf.xpraEncoding = args.encoding;
+        if (typeof args.xpraEncoding != "undefined")
+            _this.xpraConf.xpraEncoding = args.xpraEncoding;
 
         var connectNetwork = function (envsComponentsData) {
             const components = [];

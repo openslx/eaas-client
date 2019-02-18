@@ -4,7 +4,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         //showCustomMenu();
         return false;
     }
-
+    this.xpraConf = xpraConf;
     var cdebug = console.debug;
     var clog = console.log;
 
@@ -145,7 +145,8 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         else
             var audio_codec = null;
 
-        var encoding = xpraConf.xpraEncoding;
+
+        var encoding = this.xpraConf.xpraEncoding;
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
         var submit = getboolparam("submit", true);
