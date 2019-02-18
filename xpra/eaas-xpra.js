@@ -141,10 +141,11 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         } else if (Utilities.isSafari()) {
             var audio_codec = getparam("audio_codec") || "legacy:wav";
         } else if (Utilities.isFirefox())
-            var audio_codec = getparam("audio_codec") || "mediasource:opus+mka"; //temporary
+            var audio_codec = getparam("audio_codec") || "mediasource:opus+mka";
         else
             var audio_codec = null;
-        var encoding = "png";
+
+        var encoding = xpraConf.xpraEncoding;
         var bandwidth_limit = getparam("bandwidth_limit") || 0;
         var action = getparam("action") || "connect";
         var submit = getboolparam("submit", true);
