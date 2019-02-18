@@ -14,7 +14,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         this.release();
     }.bind(this);
 
-
+    // default xpra values
     this.xpraConf = {
         xpraWidth: 640,
         xpraHeight: 480,
@@ -340,7 +340,7 @@ EaasClient.Client = function (api_entrypoint, container) {
      */
     this.start = function (environments, args) {
         this.tcpGatewayConfig = args.tcpGatewayConfig;
-        if (typeof args.xpraEncoding != "undefined")
+        if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
 
         var connectNetwork = function (envsComponentsData) {
