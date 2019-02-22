@@ -56,7 +56,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         this.dQ = [];
         this.dQ_interval_id = null;
         this.process_interval = 0;
-        this.server_resize_exact = false;
+        this.server_resize_exact = true;
         this.server_screen_sizes = [];
         this.server_is_desktop = false;
         this.server_connection_data = false;
@@ -522,20 +522,21 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         document.addEventListener("visibilitychange", function (e) {
             window_ids = Object.keys(client.id_to_window).map(Number);
             clog("visibilitychange hidden=", document.hidden);
-            if (document.hidden) {
-                client.send(["suspend", true, window_ids]);
-            }
-            else {
+            // if (document.hidden) {
+            //     client.send(["suspend", true, window_ids]);
+            // }
+            // else {
                 client.send(["resume", true, window_ids]);
                 client.redraw_windows();
                 client.request_refresh(-1);
-            }
-        });
+            // }
+        }
+        );
 
 
 
         /**
-         * Client PATCH
+         * Client PATCH (methods overrides)
          */
 
         client.connect = function() {
