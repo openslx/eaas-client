@@ -95,25 +95,25 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
     XpraClient.prototype.getMouse = function (e, window) {
         var mx = e.clientX + jQuery(document).scrollLeft();
         var my = e.clientY + jQuery(document).scrollTop();
-        if (isNaN(mx) || isNaN(my)) {
-            if (!isNaN(this.last_mouse_x) && !isNaN(this.last_mouse_y)) {
-                mx = this.last_mouse_x;
-                my = this.last_mouse_y
-            } else {
-                mx = 0;
-                my = 0
-            }
-        } else {
-            this.last_mouse_x = mx;
-            this.last_mouse_y = my
-        }
+        // if (isNaN(mx) || isNaN(my)) {
+        //     if (!isNaN(this.last_mouse_x) && !isNaN(this.last_mouse_y)) {
+        //         mx = this.last_mouse_x;
+        //         my = this.last_mouse_y
+        //     } else {
+        //         mx = 0;
+        //         my = 0
+        //     }
+        // } else {
+        //     this.last_mouse_x = mx;
+        //     this.last_mouse_y = my
+        // }
         var mbutton = 0;
         if ("which" in e) mbutton = Math.max(0, e.which); else if ("button" in e) mbutton = Math.max(0, e.button) + 1;
-        if (window && this.server_is_desktop) {
-            var pos = jQuery(window.div).position();
-            mx -= pos.left;
-            my -= pos.top
-        }
+        // if (window && this.server_is_desktop) {
+        //     var pos = jQuery(window.div).position();
+        //     mx -= pos.left;
+        //     my -= pos.top
+        // }
 
 
         var offset = $("#emulator-container").offset();
