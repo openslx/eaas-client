@@ -58,7 +58,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         this.process_interval = 0;
         this.server_resize_exact = true;
         this.server_screen_sizes = [];
-        this.server_is_desktop = false;
+        this.server_is_desktop = true;
         this.server_connection_data = false;
         this.id_to_window = {};
         this.ui_events = 0;
@@ -522,14 +522,14 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         document.addEventListener("visibilitychange", function (e) {
             window_ids = Object.keys(client.id_to_window).map(Number);
             clog("visibilitychange hidden=", document.hidden);
-            // if (document.hidden) {
-            //     client.send(["suspend", true, window_ids]);
-            // }
-            // else {
+            if (document.hidden) {
+                // client.send(["suspend", true, window_ids]);
+            }
+            else {
                 client.send(["resume", true, window_ids]);
                 client.redraw_windows();
                 client.request_refresh(-1);
-            // }
+            }
         }
         );
 
@@ -619,8 +619,8 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
             var screen = document.getElementById("emulator-container");
             screen.appendChild(mydiv);
             // set initial sizes
-            mycanvas.width = xpraConf.xpraWidth;
-            mycanvas.height = xpraConf.xpraHeight;
+            mycanvas.width = w;
+            mycanvas.height = h;
             // eaas: top left corner of the canvas
             x = 0;
             y = 0;
