@@ -721,6 +721,11 @@ EaasClient.Client = function (api_entrypoint, container) {
         });
     };
 
+    this.sendEsc = function() {
+        this.guac.sendKeyEvent(1, 0xff1b);
+        this.guac.sendKeyEvent(0, 0xff1b);
+    };
+
     this.sendCtrlAltDel = function() {
         this.guac.sendKeyEvent(1, 0xFFE9);
         this.guac.sendKeyEvent(1, 0xFFE3);
