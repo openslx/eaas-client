@@ -381,6 +381,10 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         client.port = port;
         client.ssl = ssl;
         client.path = path;
+        const xpraURL2 = new URL(xpraUrl, self.location);
+        if (xpraURL2.protocol === "wss:" || xpraURL2.protocol === "https:") {
+            client.ssl = true;
+        }
         return client;
     }
 
