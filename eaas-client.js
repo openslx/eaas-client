@@ -339,6 +339,7 @@ EaasClient.Client = function (api_entrypoint, container) {
      * @returns {*}
      */
     this.start = function (environments, args) {
+        window.$rootScope.idsData = [];
         this.tcpGatewayConfig = args.tcpGatewayConfig;
         if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
@@ -384,6 +385,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     url: API_URL + "/components",
                     headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
                     success: function (envData, status2, xhr2) {
+                        envData.env = environments[i];
                         idsData.push(envData);
                         if(environments[i].visualize == true){
                             console.log("_this.componentId "+ _this.componentId);
@@ -404,6 +406,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     contentType: "application/json"
                 })
             }
+            window.$rootScope.idsData = idsData;
             connectNetwork(idsData);
         };
 
