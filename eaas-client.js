@@ -339,7 +339,8 @@ EaasClient.Client = function (api_entrypoint, container) {
      * @returns {*}
      */
     this.start = function (environments, args) {
-        window.$rootScope.idsData = [];
+        if(window.$rootScope)
+        	window.$rootScope.idsData = [];
         this.tcpGatewayConfig = args.tcpGatewayConfig;
         if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
@@ -406,7 +407,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                     contentType: "application/json"
                 })
             }
-            window.$rootScope.idsData = idsData;
+            if(window.$rootScope)
+            	window.$rootScope.idsData = idsData;
             connectNetwork(idsData);
         };
 
