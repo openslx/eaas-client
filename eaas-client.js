@@ -606,8 +606,19 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
 
         console.log("Disconnecting viewer...");
-        if (this.guac)
+
+        if (_this.mode === "guac") {
             this.guac.disconnect();
+        }
+        else if (_this.mode === "xpra") {
+            _this.xpraClient.close();
+        }
+
+        var myNode = document.getElementById("emulator-container");
+        // it's supposed to be faster, than / myNode.innerHTML = ''; /
+        while (myNode.firstChild) {
+            myNode.removeChild(myNode.firstChild);
+        }
 
         console.log("Viewer disconnected successfully.")
         this.isConnected = false;
@@ -816,7 +827,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 jQuery.Deferred(function (deferred) {
                     jQuery(deferred.resolve);
                 })).done(function () {
-                    loadXpra(xpraUrl, xpraPath, _this.xpraConf);
+                   _this.xpraClient =  loadXpra(xpraUrl, xpraPath, _this.xpraConf, _this);
                 }
             )
         })

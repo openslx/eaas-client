@@ -1,4 +1,4 @@
-var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
+var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
 // disable right click menu:
     window.oncontextmenu = function(e) {
         //showCustomMenu();
@@ -665,6 +665,8 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
 
 
         client.connect(xpraPath);
+        eaasClientObj.xpraClient = client;
+
 
         //from now on, send log and debug to client function
         //which may forward it to the server once connected:
@@ -714,8 +716,6 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf) {
         XpraWindow.prototype.update_zindex = function() {
             jQuery(this.div).css('z-index', 1000);
         }
-
-
     });
 
     XpraClient.prototype.init_keyboard = function() {
