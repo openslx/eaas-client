@@ -338,7 +338,7 @@ EaasClient.Client = function (api_entrypoint, container) {
      * @param args
      * @returns {*}
      */
-    this.start = function (environments, args) {
+    this.start = function (environments, args, attachId) {
         if(window.$rootScope)
         	window.$rootScope.idsData = [];
         this.tcpGatewayConfig = args.tcpGatewayConfig;
@@ -414,6 +414,17 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         var deferred = $.Deferred();
 
+        if (attachId) {
+            if (environments.length > 1) {
+                _this._onFatalError("We don't support hot connetion for multiple environments ... yet. ");
+                deferred.reject();
+                return deferred.promise();
+            }
+            console.log(" I came to attachId section!" , environments[0]);
+
+            return this.startAndAttach(environments, args, attachId);
+        }
+
         if (environments.length > 1) {
             connectEnvs(environments)
         } else {
@@ -451,6 +462,76 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         return deferred.promise();
     };
+    /**
+     * FIXME merge with function with start(), remove duplicate code, refactor it and make stuff nicer
+     * @param environmentId
+     * @param args
+     * @param attachId
+     * @returns {*|jQuery}
+     */
+    /*
+   */
+    this.startAndAttach = function (environments, args, attachId) {
+        if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
+            _this.xpraConf.xpraEncoding = args.xpraEncoding;
+
+        var attachToSwitch = function (clientData, networkID) {
+            console.log("clientData.id " + clientData.id);
+            $.ajax({
+                type: "POST",
+                url: API_URL + "/networks/" + networkID + "/addComponentToSwitch",
+                data: JSON.stringify({
+                    componentId: clientData.id,
+                }),
+                contentType: "application/json",
+                headers: localStorage.getItem('id_token') ? {"Authorization": "Bearer " + localStorage.getItem('id_token')} : {}
+            }).then(function (status, xhr) {
+                    _this.isStarted = true;
+                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
+                    deferred.resolve();
+                },
+                function (xhr) {
+                    _this._onFatalError($.parseJSON(xhr.responseText));
+                    deferred.reject();
+                });
+        };
+
+        var connectEnvs = function(environments, attachId) {
+            var idsData = [];
+            for (let i = 0; i < environments.length; i++) {
+                $.ajax({
+                    type: "POST",
+                    url: API_URL + "/components",
+                    headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
+                    success: function (envData, status2, xhr2) {
+                        idsData.push(envData);
+                        if (environments[i].visualize == true) {
+                            console.log("_this.componentId " + _this.componentId);
+                            if (_this.componentId != null) {
+                                console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
+                                return;
+                            }
+                            _this.componentId = envData.id;
+                            _this.driveId = envData.driveId;
+                            var eventUrl = API_URL + "/components/" + envData.id + "/events";
+                            if (localStorage.getItem('id_token'))
+                                eventUrl += "?access_token=" + localStorage.getItem('id_token');
+                            _this.eventSource = new EventSource(eventUrl);
+                        }
+                    },
+                    async:false,
+                    data: JSON.stringify(environments[i].data),
+                    contentType: "application/json"
+                })
+            }
+            attachToSwitch(idsData[0], attachId);
+        };
+        var deferred = $.Deferred();
+        connectEnvs(environments, attachId);
+
+        return deferred.promise();
+    };
+
 
     /**
      * Method to support obsolete APIs and single environment sessions
