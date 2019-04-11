@@ -154,7 +154,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                      });
                 }
             }
-            url = formatStr("/networks/{0}/keepalive", _this.networkId);
+            url = formatStr("/sessions/{0}/keepalive", _this.networkId);
         } else if (_this.componentId != null) {
             url = formatStr("/components/{0}/keepalive", _this.componentId);
         }
@@ -649,7 +649,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     {
                         id: this.componentId,
                         type: "network",
-                        keepalive_url: `${API_URL}/networks/${this.networkId}/keepalive`,
+                        keepalive_url: `${API_URL}/sessions/${this.networkId}/keepalive`,
                     }
                 ],
             }),
