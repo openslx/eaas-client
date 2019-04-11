@@ -632,26 +632,15 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.detach = async function (detachTime_minutes) {
-        const res = await fetch(`${API_URL}/sessions`, {
+        let url = API_URL + formatStr("/sessions/{0}/detach", _this.networkId),
+        const res = await fetch(``, {
             method: "POST",
             headers: {
                 "content-type": "application/json",
             },
             body: JSON.stringify({
                 lifetime: detachTime_minutes,
-                lifetime_unit: "minutes",
-                resources: [
-                    {
-                        id: this.networkId,
-                        type: "component",
-                        keepalive_url: `${API_URL}/components/${this.componentId}/keepalive`,
-                    },
-                    {
-                        id: this.componentId,
-                        type: "network",
-                        keepalive_url: `${API_URL}/sessions/${this.networkId}/keepalive`,
-                    }
-                ],
+                lifetime_unit: "minutes"
             }),
         });
         if (res.status !== 200) {
