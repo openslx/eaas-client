@@ -42,6 +42,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.driveId = null;
     this.params = null;
     this.mode = null;
+    this.detached = false;
 
     // ID for registered this.pollState() with setInterval()
     this.pollStateIntervalId = null;
@@ -569,7 +570,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.connect = function () {
         var deferred = $.Deferred();
 
-        if (!this.isStarted) {
+        if (!_this.isStarted) {
             _this._onFatalError("Environment was not started properly!");
             deferred.reject();
             return deferred.promise();
@@ -631,7 +632,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
-    this.detach = async function (detachTime_minutes) {
+    this.detach = async function (name, detachTime_minutes) {
         let url = API_URL + formatStr("/sessions/{0}/detach", _this.networkId);
         const res = await fetch(url, {
             method: "POST",
@@ -640,12 +641,14 @@ EaasClient.Client = function (api_entrypoint, container) {
             },
             body: JSON.stringify({
                 lifetime: detachTime_minutes,
-                lifetime_unit: "minutes"
+                lifetime_unit: "minutes",
+                sessionName: name
             }),
         });
-        if (res.status !== 200) {
+        if (res.status !== 204) {
             throw new Error("Session cannot be detached!");
         }
+        _this.detached = true;
         window.onbeforeunload = () => void this.disconnect();
     };
 
@@ -699,7 +702,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     // Checkpoints a running session
     this.checkpoint = async function (request) {
-        if (!this.isStarted) {
+        if (!_this.isStarted) {
             _this._onFatalError("Environment was not started properly!");
             throw undefined;
         }
@@ -768,20 +771,22 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     this.stopEnvironment = function () {
 
-        if (!this.isStarted)
+        if (!_this.isStarted)
             return;
 
         if (this.pollStateIntervalId)
             clearInterval(this.pollStateIntervalId);
-        $.ajax({
-            type: "GET",
-            url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-            async: false,
-        });
-        _this.eventSource.close();
 
-        this.isStarted = false;
+        if(_this.detached === false) {
+            $.ajax({
+                type: "GET",
+                url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
+                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
+                async: false,
+            });
+        }
+        _this.eventSource.close();
+        _this.isStarted = false;
 
         $(container).empty();
     };
@@ -791,20 +796,24 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.release = function () {
+        this.clearTimer();
+
         var result = this.disconnect();
         while (result.state() === "pending") {
             continue;  // Wait for completion!
         }
 
         this.stopEnvironment();
-        this.clearTimer();
 
-        $.ajax({
-            type: "DELETE",
-            url: API_URL + formatStr("/components/{0}", _this.componentId),
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-            async: false,
-        });
+        if(_this.detached === false)
+        {
+            $.ajax({
+                type: "DELETE",
+                url: API_URL + formatStr("/components/{0}", _this.componentId),
+                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
+                async: false,
+            });
+        }
     };
 
     this.sendEsc = function() {
