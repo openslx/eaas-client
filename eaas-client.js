@@ -633,6 +633,9 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.detach = async function (name, detachTime_minutes) {
+        if(_this.detached)
+            return;
+
         let url = API_URL + formatStr("/sessions/{0}/detach", _this.networkId);
         const res = await fetch(url, {
             method: "POST",
