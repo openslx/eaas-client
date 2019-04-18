@@ -632,7 +632,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         return deferred.promise();
     };
 
-    this.detach = async function (name, detachTime_minutes) {
+    this.detach = async function (name, detachTime_minutes, customComponentName) {
         if(_this.detached)
             return;
 
@@ -645,7 +645,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             body: JSON.stringify({
                 lifetime: detachTime_minutes,
                 lifetime_unit: "minutes",
-                sessionName: name
+                sessionName: name,
+                componentTitle: {componentName: customComponentName, componentId: _this.componentId}
             }),
         });
         if (res.status !== 204) {
