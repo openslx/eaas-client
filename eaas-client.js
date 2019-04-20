@@ -43,6 +43,8 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.params = null;
     this.mode = null;
     this.detached = false;
+    this.abort = false;
+    this.released = false;
 
     // ID for registered this.pollState() with setInterval()
     this.pollStateIntervalId = null;
@@ -96,6 +98,18 @@ EaasClient.Client = function (api_entrypoint, container) {
     var emulatorState;
 
     this.pollState = function () {
+
+        if(_this.abort)
+        {
+            if (_this.pollStateIntervalId)
+                clearInterval(_this.pollStateIntervalId);
+
+            _this.disconnect();
+            if(_this.eventSource)
+                _this.eventSource.close();
+
+            return;
+        }
 
         $.ajax({
             type: "GET",
@@ -256,7 +270,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     this.getContainerResultUrl = function()
     {
-        console.log(_this.componentId);
+        // console.log(_this.componentId);
         if(_this.componentId == null){
             this.onError("Component ID is null, please contact administrator");
         }
@@ -377,11 +391,10 @@ EaasClient.Client = function (api_entrypoint, container) {
                 });
         };
 
-
         var connectEnvs = function(environments) {
             var idsData = [];
             for (let i = 0; i < environments.length; i++) {
-                console.log("env: " + environments[i].data.environment);
+                console.log("starting environment: " + environments[i].data.environment);
                 $.ajax({
                     type: "POST",
                     url: API_URL + "/components",
@@ -421,7 +434,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 deferred.reject();
                 return deferred.promise();
             }
-            console.log(" I came to attachId section!" , environments[0]);
+            // console.log(" I came to attachId section!" , environments[0]);
 
             return this.startAndAttach(environments, args, attachId);
         }
@@ -477,7 +490,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
 
         var attachToSwitch = function (clientData, networkID) {
-            console.log("clientData.id " + clientData.id);
+            // console.log("clientData.id " + clientData.id);
             $.ajax({
                 type: "POST",
                 url: API_URL + "/networks/" + networkID + "/addComponentToSwitch",
@@ -507,7 +520,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     success: function (envData, status2, xhr2) {
                         idsData.push(envData);
                         if (environments[i].visualize == true) {
-                            console.log("_this.componentId " + _this.componentId);
+                            // console.log("_this.componentId " + _this.componentId);
                             if (_this.componentId != null) {
                                 console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
                                 return;
@@ -570,8 +583,10 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.connect = function () {
         var deferred = $.Deferred();
 
-        if (!_this.isStarted) {
-            _this._onFatalError("Environment was not started properly!");
+        if (!_this.isStarted || _this.abort) {
+
+            if(!_this.isStarted)
+                _this._onFatalError("Environment was not started properly!");
             deferred.reject();
             return deferred.promise();
         }
@@ -721,7 +736,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             const data = await $.ajax({
                 type: "POST",
                 url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
-                timeout: 30000,
+                timeout: 60000,
                 contentType: "application/json",
                 data: JSON.stringify(request),
                 headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
@@ -778,8 +793,8 @@ EaasClient.Client = function (api_entrypoint, container) {
         if (!_this.isStarted)
             return;
 
-        if (this.pollStateIntervalId)
-            clearInterval(this.pollStateIntervalId);
+        if (_this.pollStateIntervalId)
+            clearInterval(_this.pollStateIntervalId);
 
         if(_this.detached === false) {
             $.ajax({
@@ -789,7 +804,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                 async: false,
             });
         }
-        _this.eventSource.close();
         _this.isStarted = false;
 
         $(container).empty();
@@ -800,7 +814,16 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.release = function () {
+        if(_this.released)
+            return;
+
+        _this.released = true;
+
+        _this.abort = true;
         this.clearTimer();
+
+        if(_this.eventSource)
+            _this.eventSource.close();
 
         var result = this.disconnect();
         while (result.state() === "pending") {
@@ -811,6 +834,9 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         if(_this.detached === false)
         {
+            if(!_this.componentId)
+                return;
+
             $.ajax({
                 type: "DELETE",
                 url: API_URL + formatStr("/components/{0}", _this.componentId),
