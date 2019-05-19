@@ -428,7 +428,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         if (attachId) {
             if (environments.length > 1) {
-                _this._onFatalError("We don't support hot connetion for multiple environments ... yet. ");
+                _this._onFatalError("We don't support hot connection for multiple environments ... yet. ");
                 deferred.reject();
                 return deferred.promise();
             }
@@ -437,7 +437,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             return this.startAndAttach(environments, args, attachId);
         }
 
-        if (environments.length > 1) {
+        if (environments.length > 1 || args.enableNetwork) {
             connectEnvs(environments)
         } else {
             console.log("Starting environment " + environments[0].data.environment + "...");
