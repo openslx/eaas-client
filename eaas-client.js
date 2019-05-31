@@ -618,6 +618,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     controlUrl = data.xpra;
                     _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadXpra;
+                    _this.initWebRtcAudio(controlUrl);
                     _this.mode = "xpra";
                 }
                 // WebEmulator connector
@@ -703,6 +704,9 @@ EaasClient.Client = function (api_entrypoint, container) {
             this.guac.disconnect();
         }
         else if (_this.mode === "xpra") {
+            if (_this.peer_connection != null)
+                _this.peer_connection.close();
+
             _this.xpraClient.close();
         }
 
@@ -1004,6 +1008,117 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
 
+    // WebRTC based sound
+    this.initWebRtcAudio = function (xpraUrl) {
+        //const audioStreamElement = document.createElement('audio');
+        //audioStreamElement.controls = true;
+        //document.documentElement.appendChild(audioStreamElement);
+
+        const client = _this;
+
+        const audioctx = new AudioContext();
+
+        const rtcConfig = {
+            iceServers: [
+                { urls: "stun:stun.services.mozilla.com" },
+                { urls: "stun:stun.l.google.com:19302" }
+            ]
+        };
+
+        console.log("Creating RTC peer connection...");
+        client.peer_connection = new RTCPeerConnection(rtcConfig);
+
+        client.peer_connection.onicecandidate = async (event) => {
+            if (event.candidate == null) {
+                console.log("No ICE candidate found!");
+                return;
+            }
+
+            console.log("Sending ICE candidate to server...");
+
+            const body = {
+                type: 'ice',
+                data: event.candidate
+            };
+
+            const request = {
+                method: 'POST',
+                body: JSON.stringify(body)
+            };
+
+            await fetch(xpraUrl, request);
+        };
+
+
+        /*
+        client.peer_connection.ontrack = async (event) => {
+            console.log("XXXXXXXXXXXXXXXX ONTRACK: ", event);
+            console.log("Remote track received");
+            audioStreamElement.srcObject = event.streams[0];
+            //audioctx.createMediaStreamSource(event.streams[0])
+            //    .connect(audioctx.destination);
+        };
+        */
+
+        client.peer_connection.onaddstream = async (event) => {
+            console.log("XXXXXXXXXXXXXXXX ONADDSTREAM: ", event);
+            console.log("Remote stream received");
+            //audioStreamElement.srcObject = event.stream;
+            audioctx.createMediaStreamSource(event.stream)
+                .connect(audioctx.destination);
+        };
+
+        const onServerMessage = async (response) => {
+            const message = await response.json();
+            if (message) {
+                try {
+                    switch (message.type) {
+                        case 'ice':
+                            console.log("Remote ICE candidate received");
+                            console.log(message.data.candidate);
+                            const candidate = new RTCIceCandidate(message.data);
+                            await client.peer_connection.addIceCandidate(candidate);
+                            break;
+
+                        case 'sdp':
+                            console.log("Remote SDP offer received");
+                            console.log(message.data.sdp);
+                            const offer = new RTCSessionDescription(message.data);
+                            await client.peer_connection.setRemoteDescription(offer);
+                            const answer = await client.peer_connection.createAnswer({ voiceActivityDetection: false });
+                            await client.peer_connection.setLocalDescription(answer);
+                            console.log("SDP-Answer: ", answer.sdp);
+
+                            const body = {
+                                type: 'sdp',
+                                data: answer
+                            };
+
+                            const request = {
+                                method: 'POST',
+                                body: JSON.stringify(body)
+                            };
+
+                            console.log("Sending SDP answer...");
+                            await fetch(xpraUrl, request);
+
+                            break;
+
+                        default:
+                            console.error("Unsupported message type: " + message.type);
+                    }
+                }
+                catch (error) {
+                    console.log(error);
+                }
+            }
+
+            // start next long-polling request
+            fetch(xpraUrl).then(onServerMessage);
+        };
+
+        fetch(xpraUrl).then(onServerMessage);
+    }
 };
 /*
  *  Example usage:
