@@ -45,6 +45,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.detached = false;
     this.abort = false;
     this.released = false;
+    this.envsComponentsData = [];
 
     // ID for registered this.pollState() with setInterval()
     this.pollStateIntervalId = null;
@@ -354,8 +355,6 @@ EaasClient.Client = function (api_entrypoint, container) {
      * @returns {*}
      */
     this.start = function (environments, args, attachId) {
-        if(window.$rootScope)
-        	window.$rootScope.idsData = [];
         this.tcpGatewayConfig = args.tcpGatewayConfig;
         if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
@@ -388,7 +387,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                 function (xhr) {
                     _this._onFatalError($.parseJSON(xhr.responseText));
                     deferred.reject();
-                });
+                }
+           );
         };
 
         var connectEnvs = function(environments) {
@@ -421,8 +421,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                     contentType: "application/json"
                 })
             }
-            if(window.$rootScope)
-            	window.$rootScope.idsData = idsData;
             connectNetwork(idsData);
         };
 
@@ -430,7 +428,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         if (attachId) {
             if (environments.length > 1) {
-                _this._onFatalError("We don't support hot connetion for multiple environments ... yet. ");
+                _this._onFatalError("We don't support hot connection for multiple environments ... yet. ");
                 deferred.reject();
                 return deferred.promise();
             }
@@ -439,7 +437,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             return this.startAndAttach(environments, args, attachId);
         }
 
-        if (environments.length > 1) {
+        if (environments.length > 1 || args.enableNetwork) {
             connectEnvs(environments)
         } else {
             console.log("Starting environment " + environments[0].data.environment + "...");
@@ -822,7 +820,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             return;
 
         _this.released = true;
-
+        _this.envsComponentsData = [];
         _this.abort = true;
         this.clearTimer();
 
