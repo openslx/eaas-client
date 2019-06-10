@@ -1062,6 +1062,8 @@ EaasClient.Client = function (api_entrypoint, container) {
             console.log("XXXXXXXXXXXXXXXX ONADDSTREAM: ", event);
             console.log("Remote stream received");
             //audioStreamElement.srcObject = event.stream;
+            // HACK: Work around https://bugs.chromium.org/p/chromium/issues/detail?id=933677
+            new Audio().srcObject = event.stream;
             audioctx.createMediaStreamSource(event.stream)
                 .connect(audioctx.destination);
         };
