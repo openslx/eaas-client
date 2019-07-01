@@ -394,7 +394,6 @@ EaasClient.Client = function (api_entrypoint, container) {
         var connectEnvs = function(environments) {
             var idsData = [];
             for (let i = 0; i < environments.length; i++) {
-                console.log("starting environment: " + environments[i].data.environment);
                 $.ajax({
                     type: "POST",
                     url: API_URL + "/components",
@@ -403,7 +402,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                         envData.env = environments[i];
                         idsData.push(envData);
                         if(environments[i].visualize == true){
-                            console.log("_this.componentId "+ _this.componentId);
                             if(_this.componentId != null) {
                                 console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
                                 return;
@@ -440,7 +438,6 @@ EaasClient.Client = function (api_entrypoint, container) {
         if (environments.length > 1 || args.enableNetwork) {
             connectEnvs(environments)
         } else {
-            console.log("Starting environment " + environments[0].data.environment + "...");
             $.ajax({
                 type: "POST",
                 url: API_URL + "/components",
