@@ -846,13 +846,31 @@ EaasClient.Client = function (api_entrypoint, container) {
         this.guac.sendKeyEvent(0, 0xff1b);
     };
 
-    this.sendCtrlAltDel = function() {
-        this.guac.sendKeyEvent(1, 0xFFE9);
-        this.guac.sendKeyEvent(1, 0xFFE3);
-        this.guac.sendKeyEvent(1, 0xFFFF);
-        this.guac.sendKeyEvent(0, 0xFFE9);
-        this.guac.sendKeyEvent(0, 0xFFE3);
-        this.guac.sendKeyEvent(0, 0xFFFF);
+
+    this.sendCtrlAltDel = async function()
+    {
+        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
+         if (ctrlKey) {
+             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Control", keyCode: 17, bubbles: true}));
+             await new Promise(r => setTimeout(r, 100));
+         }
+         if (altKey) {
+             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Alt", keyCode: 18, bubbles: true}));
+             await new Promise(r => setTimeout(r, 100));
+         }
+         el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+         await new Promise(r => setTimeout(r, 100));
+         el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+         if (altKey) {
+             await new Promise(r => setTimeout(r, 100));
+             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Alt", keyCode: 18, bubbles: true}));
+         }
+         if (ctrlKey) {
+             await new Promise(r => setTimeout(r, 100));
+             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Control", keyCode: 17, bubbles: true}));
+         }
+        };
+        pressKey("Delete", 46, {altKey: true, ctrlKey: true, metaKey: true})
     };
 
     this.snapshot = function (postObj, onChangeDone, errorFn) {
