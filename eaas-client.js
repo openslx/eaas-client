@@ -371,6 +371,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data: JSON.stringify({
                     components: components,
                     hasInternet: args.hasInternet ? true : false,
+                    enableDhcp : true,
                     hasTcpGateway: args.hasTcpGateway ? true : false,
                     tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
                 }),
