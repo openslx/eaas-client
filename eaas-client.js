@@ -677,7 +677,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             `${localIP}:${localPort}`,
             await this.wsConnection(),
             "",
-            `${config.gwPrivateIp}/${config.gwPrivateMask}`,
+            "dhcp",
             config.serverIp,
             config.serverPort,
         ]));
