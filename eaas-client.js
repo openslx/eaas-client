@@ -191,6 +191,10 @@ EaasClient.Client = function (api_entrypoint, container) {
         const res = await fetch(url, {headers:
             localStorage.id_token ? {"authorization" : `Bearer ${localStorage.id_token}`} : {},
         });
+        
+        if (!res.ok)
+            throw new Error(await res.text());
+
         const url2 = new URL(await res.text(), API_URL);
         if (url2.port === "443") url2.protocol = "wss";
         return String(url2);
