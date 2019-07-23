@@ -17,8 +17,6 @@ function strParamsToObject(str) {
     return result;
 }
 
-
-
 export class Client {
 
     constructor (api_entrypoint, container)
@@ -68,9 +66,7 @@ export class Client {
         };
     }
 
-
-
-    async function removeNetworkComponent(netid, compid) {
+    async removeNetworkComponent(netid, compid) {
         console.log("Removing component " + compid + " from network " + netid);
         try {
             await $.ajax({
@@ -96,8 +92,7 @@ export class Client {
         console.log("Component removed: " + compid);
     }
 
-    this.pollState = function () {
-
+    pollState () {
         if(_this.abort)
         {
             if (_this.pollStateIntervalId)
@@ -132,7 +127,7 @@ export class Client {
         });
     };
 
-    this._onFatalError = function (msg) {
+    _onFatalError (msg) {
         if (this.pollStateIntervalId)
             clearInterval(this.pollStateIntervalId);
 
@@ -145,7 +140,7 @@ export class Client {
         console.error(msg);
     };
 
-    this._onResize = function (width, height) {
+    _onResize (width, height) {
         container.style.width = width;
         container.style.height = height;
 
@@ -154,7 +149,7 @@ export class Client {
         }
     };
 
-    this.keepalive = function () {
+    keepalive () {
         var url = null;
 
         if (_this.networkId != null) {
@@ -180,7 +175,7 @@ export class Client {
         });
     };
 
-    this.wsConnection = async function () {
+    async wsConnection () {
         if (_this.networkId == null) {
             return null;
         }
@@ -198,7 +193,7 @@ export class Client {
         return String(url2);
     }
 
-    this.establishGuacamoleTunnel = function (controlUrl) {
+    establishGuacamoleTunnel (controlUrl) {
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX, y = window.scrollY;
             this.focus();
@@ -271,7 +266,7 @@ export class Client {
          */
     };
 
-    this.getContainerResultUrl = function()
+    getContainerResultUrl ()
     {
         // console.log(_this.componentId);
         if(_this.componentId == null){
@@ -280,7 +275,7 @@ export class Client {
         return API_URL + formatStr("/components/{0}/result", _this.componentId);
     };
 
-    this.startContainer = function(containerId, args)
+    startContainer (containerId, args)
     {
         var data = {};
         data.type = "container";
@@ -356,7 +351,7 @@ export class Client {
      * @param args
      * @returns {*}
      */
-    this.start = function (environments, args, attachId) {
+    start  (environments, args, attachId) {
         this.tcpGatewayConfig = args.tcpGatewayConfig;
         if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
@@ -483,7 +478,7 @@ export class Client {
      */
     /*
    */
-    this.startAndAttach = function (environments, args, attachId) {
+    startAndAttach  (environments, args, attachId) {
         if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             _this.xpraConf.xpraEncoding = args.xpraEncoding;
 
@@ -552,7 +547,7 @@ export class Client {
      * @param args
      * @returns {*}
      */
-    this.startEnvironment = function (environmentId, args, input_data) {
+    startEnvironment (environmentId, args, input_data) {
         var data = {};
         data.type = "machine";
         data.environment = environmentId;
@@ -578,7 +573,7 @@ export class Client {
 
 
     // Connects viewer to a running session
-    this.connect = function () {
+    connect  () {
         var deferred = $.Deferred();
 
         if (!_this.isStarted || _this.abort) {
@@ -645,7 +640,7 @@ export class Client {
         return deferred.promise();
     };
 
-    this.detach = async function (name, detachTime_minutes, customComponentName) {
+    async detach (name, detachTime_minutes, customComponentName) {
         if(_this.detached)
             return;
 
@@ -669,11 +664,13 @@ export class Client {
         window.onbeforeunload = () => void this.disconnect();
     };
 
-    this.getProxyURL = async function ({
-        tcpGatewayConfig: config = this.tcpGatewayConfig,
-        localPort = "8080",
-        localIP = "127.0.0.1",
-    } = {}) {
+    async getProxyURL (
+        {
+            tcpGatewayConfig: config = this.tcpGatewayConfig,
+            localPort = "8080",
+            localIP = "127.0.0.1",
+        } = {})
+        {
         const eaasURL = new URL("web+eaas-proxy:");
         eaasURL.search = encodeURIComponent(JSON.stringify([
             `${localIP}:${localPort}`,
@@ -687,7 +684,7 @@ export class Client {
     };
 
     // Disconnects viewer from a running session
-    this.disconnect = function () {
+    disconnect () {
         var deferred = $.Deferred();
 
         if (!this.isConnected) {
@@ -718,7 +715,7 @@ export class Client {
     };
 
     // Checkpoints a running session
-    this.checkpoint = async function (request) {
+    async checkpoint (request) {
         if (!_this.isStarted) {
             _this._onFatalError("Environment was not started properly!");
             throw undefined;
@@ -754,16 +751,12 @@ export class Client {
         }
     };
 
-    this.getScreenshotUrl = function () {
-        return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
-    };
-
-    this.downloadPrint = function (label)
+    downloadPrint (label)
     {
-        return API_URL + formatStr("/components/{0}/downloadPrintJob?label={1}", _this.componentId, encodeURI(label));
+        return `${this.API_URL}/components/${this.componentId}/downloadPrintJob?label=${encodeURI(label)}`;
     }
 
-    this.getPrintJobs = function (successFn, errorFn) {
+    getPrintJobs(successFn, errorFn) {
         $.ajax({
             type: "GET",
             url: API_URL + formatStr("/components/{0}/printJobs", _this.componentId),
@@ -777,7 +770,7 @@ export class Client {
         });
     };
 
-    this.getEmulatorState = function () {
+   getEmulatorState () {
         if (typeof(emulatorState) !== "undefined")
             return emulatorState;
         else {
@@ -786,7 +779,7 @@ export class Client {
         }
     };
 
-    this.stopEnvironment = function () {
+    stopEnvironment () {
 
         if (!_this.isStarted)
             return;
@@ -807,11 +800,11 @@ export class Client {
         $(container).empty();
     };
 
-    this.clearTimer = function () {
+    clearTimer () {
         clearInterval(this.keepaliveIntervalId);
     };
 
-    this.release = function () {
+    release () {
         if(_this.released)
             return;
 
@@ -844,13 +837,13 @@ export class Client {
         }
     };
 
-    this.sendEsc = function() {
+    sendEsc() {
         this.guac.sendKeyEvent(1, 0xff1b);
         this.guac.sendKeyEvent(0, 0xff1b);
     };
 
 
-    this.sendCtrlAltDel = async function()
+    async sendCtrlAltDel()
     {
         const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
          if (ctrlKey) {
@@ -876,7 +869,7 @@ export class Client {
         pressKey("Delete", 46, {altKey: true, ctrlKey: true, metaKey: true})
     };
 
-    this.snapshot = function (postObj, onChangeDone, errorFn) {
+    snapshot (postObj, onChangeDone, errorFn) {
         $.ajax({
             type: "POST",
             url: API_URL + formatStr("/components/{0}/snapshot", _this.componentId),
@@ -896,7 +889,7 @@ export class Client {
         });
     };
 
-    this.changeMedia = function (postObj, onChangeDone) {
+    changeMedia  (postObj, onChangeDone) {
         $.ajax({
             type: "POST",
             url: API_URL + formatStr("/components/{0}/changeMedia", _this.componentId),
@@ -908,7 +901,7 @@ export class Client {
         });
     };
 
-    this.prepareAndLoadXpra = function (xpraUrl) {
+    prepareAndLoadXpra  (xpraUrl) {
         /*
          search for xpra path, in order to include it to filePath
          */
@@ -958,7 +951,7 @@ export class Client {
         })
     };
 
-    this.prepareAndLoadWebEmulator = function (url) {
+    prepareAndLoadWebEmulator  (url) {
         /*
          search for eaas-client.js path, in order to include it to filePath
          */
@@ -977,7 +970,7 @@ export class Client {
         container.appendChild(iframe);
     };
 
-    this.startDockerEnvironment = function (environmentId, args) {
+    startDockerEnvironment (environmentId, args) {
         var data = {};
         data.type = "container";
         data.environment = environmentId;
@@ -1155,11 +1148,8 @@ var BwflaMouse = function(client)
     };
 };
 
-var BWFLA = BWFLA || {};
-
-
 /** Requests a pointer-lock on given element, if supported by the browser. */
-BWFLA.requestPointerLock = function(target, event)
+export function requestPointerLock (target, event)
 {
     function lockPointer() {
         var havePointerLock = 'pointerLockElement' in document
@@ -1234,15 +1224,15 @@ BWFLA.requestPointerLock = function(target, event)
 
 
 /** Hides the layer containing client-side mouse-cursor. */
-BWFLA.hideClientCursor = function(guac)
+export function hideClientCursor (guac)
 {
     var display = guac.getDisplay();
     display.showCursor(false);
-};
+}
 
 
 /** Shows the layer containing client-side mouse-cursor. */
-BWFLA.showClientCursor = function(guac)
+export function showClientCursor (guac)
 {
     var display = guac.getDisplay();
     display.showCursor(true);
