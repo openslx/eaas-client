@@ -1,72 +1,74 @@
-var EaasClient = EaasClient || {};
 
-/**
- * Determines the resolution
- */
+function formatStr(format) {
+        var args = Array.prototype.slice.call(arguments, 1);
+    return format.replace(/{(\d+)}/g, function (match, number) {
+        return typeof args[number] != 'undefined' ? args[number] : match;
+    });
+}
 
-EaasClient.Client = function (api_entrypoint, container) {
+function strParamsToObject(str) {
+    var result = {};
+    if (!str) return result; // return on empty string
+
+    str.split("&").forEach(function (part) {
+        var item = part.split("=");
+        result[item[0]] = decodeURIComponent(item[1]);
+    });
+    return result;
+}
 
 
 
-    // Clean up on window close
-    window.onbeforeunload = function () {
-        if(_this.deleteOnUnload)
-        this.release();
-    }.bind(this);
+export class Client {
 
-    // default xpra values
-    this.xpraConf = {
-        xpraWidth: 640,
-        xpraHeight: 480,
-        xpraDPI: 96,
-        xpraEncoding: "jpeg"
-    };
+    constructor (api_entrypoint, container)
+    {
+        this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
+        this.xpraConf = {
+            xpraWidth: 640,
+            xpraHeight: 480,
+            xpraDPI: 96,
+            xpraEncoding: "jpeg"
+        }
 
-    this.setXpraConf = function (width, height, dpi, xpraEncoding) {
+        this.deleteOnUnload = true;
+
+        this.componentId = null;
+        this.eventSource = null;
+        this.networkTcpInfo = null;
+        this.networkId = null;
+        this.driveId = null;
+        this.params = null;
+        this.mode = null;
+        this.detached = false;
+        this.abort = false;
+        this.released = false;
+        this.envsComponentsData = [];
+        this.isStarted = false;
+        this.isConnected = false;
+        this.emulatorState;
+
+        // ID for registered this.pollState() with setInterval()
+        this.pollStateIntervalId = null;
+
+        // Clean up on window close
+        window.addEventListener("beforeunload", () => {
+            if(this.deleteOnUnload)
+                this.release();
+        });
+    }
+
+    // default xpra value
+    setXpraConf (width, height, dpi, xpraEncoding) {
         xpraConf = {
             xpraWidth: width,
             xpraHeight: height,
             xpraDPI: dpi,
             xpraEncoding: xpraEncoding
         };
-    };
-
-    var _this = this;
-    _this.deleteOnUnload = true;
-    var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
-
-    this.componentId = null;
-    this.eventSource = null;
-    this.networkTcpInfo = null;
-    this.networkId = null;
-    this.driveId = null;
-    this.params = null;
-    this.mode = null;
-    this.detached = false;
-    this.abort = false;
-    this.released = false;
-    this.envsComponentsData = [];
-
-    // ID for registered this.pollState() with setInterval()
-    this.pollStateIntervalId = null;
-
-    function formatStr(format) {
-        var args = Array.prototype.slice.call(arguments, 1);
-        return format.replace(/{(\d+)}/g, function (match, number) {
-            return typeof args[number] != 'undefined' ? args[number] : match;
-        });
     }
 
-    function strParamsToObject(str) {
-        var result = {};
-        if (!str) return result; // return on empty string
 
-        str.split("&").forEach(function (part) {
-            var item = part.split("=");
-            result[item[0]] = decodeURIComponent(item[1]);
-        });
-        return result;
-    }
 
     async function removeNetworkComponent(netid, compid) {
         console.log("Removing component " + compid + " from network " + netid);
@@ -93,10 +95,6 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         console.log("Component removed: " + compid);
     }
-
-    var isStarted = false;
-    var isConnected = false;
-    var emulatorState;
 
     this.pollState = function () {
 
@@ -419,7 +417,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                             _this.eventSource = new EventSource(eventUrl);
                         }
                     },
-                    async:false,
+                    async: false,
                     data: JSON.stringify(environments[i].data),
                     contentType: "application/json"
                 })
