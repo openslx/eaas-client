@@ -668,7 +668,11 @@ EaasClient.Client = function (api_entrypoint, container) {
             throw new Error("Session cannot be detached!");
         }
         _this.detached = true;
-        window.onbeforeunload = () => void this.disconnect();
+        window.onbeforeunload = () => {};
+
+       _this.disconnect();
+        if (_this.pollStateIntervalId)
+              clearInterval(_this.pollStateIntervalId);
     };
 
     this.getProxyURL = async function ({
