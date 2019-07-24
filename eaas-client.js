@@ -670,9 +670,10 @@ EaasClient.Client = function (api_entrypoint, container) {
         _this.detached = true;
         window.onbeforeunload = () => {};
 
-       _this.disconnect();
         if (_this.pollStateIntervalId)
-              clearInterval(_this.pollStateIntervalId);
+            clearInterval(_this.pollStateIntervalId);
+
+       _this.disconnect();
     };
 
     this.getProxyURL = async function ({
