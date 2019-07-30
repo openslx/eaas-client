@@ -670,10 +670,9 @@ EaasClient.Client = function (api_entrypoint, container) {
         _this.detached = true;
         window.onbeforeunload = () => {};
 
-        if (_this.pollStateIntervalId)
-            clearInterval(_this.pollStateIntervalId);
-
        _this.disconnect();
+        if (_this.pollStateIntervalId)
+              clearInterval(_this.pollStateIntervalId);
     };
 
     this.getProxyURL = async function ({
@@ -793,7 +792,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
     };
 
-    this.stopEnvironment = function () {
+    this.stopEnvironment = async function () {
 
         if (!_this.isStarted)
             return;
@@ -806,7 +805,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 type: "GET",
                 url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
                 headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                async: false,
+                async: true,
             });
         }
         _this.isStarted = false;
@@ -818,8 +817,8 @@ EaasClient.Client = function (api_entrypoint, container) {
         clearInterval(this.keepaliveIntervalId);
     };
 
-    this.release = function () {
-        if(_this.released)
+    this.release = async function () {
+        if (_this.released)
             return;
 
         _this.released = true;
@@ -827,7 +826,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         _this.abort = true;
         this.clearTimer();
 
-        if(_this.eventSource)
+        if (_this.eventSource)
             _this.eventSource.close();
 
         var result = this.disconnect();
@@ -835,20 +834,21 @@ EaasClient.Client = function (api_entrypoint, container) {
             continue;  // Wait for completion!
         }
 
-        this.stopEnvironment();
+        await this.stopEnvironment();
 
-        if(_this.detached === false)
-        {
-            if(!_this.componentId)
+        if (_this.detached === false) {
+            if (!_this.componentId)
                 return;
 
-            $.ajax({
+            return $.ajax({
                 type: "DELETE",
                 url: API_URL + formatStr("/components/{0}", _this.componentId),
-                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                async: false,
+                headers: localStorage.getItem('id_token') ? {"Authorization": "Bearer " + localStorage.getItem('id_token')} : {},
+                async: true,
             });
         }
+
+
     };
 
     this.sendEsc = function() {
