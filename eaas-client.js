@@ -17,8 +17,11 @@ function strParamsToObject(str) {
     return result;
 }
 
-export class Client {
+export class Archive {
 
+}
+
+export class Client {
     constructor (api_entrypoint, container)
     {
         this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
@@ -54,6 +57,23 @@ export class Client {
             if(this.deleteOnUnload)
                 this.release();
         });
+    }
+
+    async _fetch(url, method="GET", obj, token=null) 
+    {  
+        const res = await fetch(url, {
+            method,
+            headers:{
+                ... token &&  { authorization : `Bearer ${token}`}, 
+                ... obj && {"content-type" : "application/json" }
+            },
+            ...obj && {body: JSON.stringify(obj) },
+        });
+
+        if (res.ok)
+          return res.json();
+        
+        throw new Error(`${res.status} @ ${url} : ${await res.text()}`);
     }
 
     // default xpra value
