@@ -82,6 +82,16 @@ export class NetworkSession extends EventTarget {
         return String(url2);
     }
 
+    load(sessionId, sessions, options)
+    {
+        this.isDetached = true;
+        this.sessionId = sessionId;
+        for (const session of sessions) {
+            this.sessionComponents.push(session);
+            session.setNetworkId(session);
+        }
+    }
+
     async startNetwork(sessions, options) {
         const components = [];
 
@@ -109,7 +119,7 @@ export class NetworkSession extends EventTarget {
 
     getSession(id)
     {
-        for(session of this.sessionComponents)
+        for(let session of this.sessionComponents)
         {
             if(session.componentId === id)
                 return session;
@@ -131,42 +141,53 @@ export class NetworkSession extends EventTarget {
 }
 
 export class ComponentSession extends EventTarget {
-    constructor(api, environmentRequest, idToken = null) {
+
+    constructor(api, environmentId, componentId, idToken = null) {
         super();
 
         this.API_URL = api;
         this.idToken = idToken;
-        this.environmentRequest = environmentRequest;
+        this.environmentId = environmentId;
+        this.componentId = componentId;
+        this.driveId = -1;
 
-        this.componentId = null;
         this.eventSource = null;
 
         this.hasNetworkSession = false;
         this.released = false;
         this.emulatorState = undefined;
-        this.abort = false;
 
         this.networkId = undefined;
+
+        let eventUrl = this.API_URL + "/components/" + this.componentId + "/events";
+        if (this.idToken)
+            eventUrl += "?access_token=" + this.idToken;
+
+        this.eventSource = new EventSource(eventUrl);
+        
+        this.isStarted = true;
+    }
+
+    setdriveId(id)
+    {
+        this.driveId = id;
     }
 
     setNetworkId(nwId) {
         this.networkId = nwId;
     }
 
-    async startComponent() {
+    static async startComponent(api, environmentRequest, idToken) {
         try {
-            let result = await _fetch(`${this.API_URL}/components`, "POST", this.environmentRequest, this.idToken);
+            let result = await _fetch(`${api}/components`, "POST", environmentRequest, idToken);
 
             this.componentId = result.id;
+            
             this.driveId = result.driveId;
+            let component = new ComponentSession(api, environmentRequest.environment, result.id, idToken);
+            console.log("Environment " + environmentRequest.environment + " started.");
 
-            let eventUrl = this.API_URL + "/components/" + this.componentId + "/events";
-            if (this.idToken)
-                eventUrl += "?access_token=" + this.idToken;
-
-            this.eventSource = new EventSource(eventUrl);
-            console.log("Environment " + this.environmentRequest.environment + " started.");
-            this.isStarted = true;
+           return component;
         }
         catch (e) {
             throw new Error("failed to start environmemt: " + e);
@@ -197,6 +218,14 @@ export class ComponentSession extends EventTarget {
         else return null;
     }
 
+    disconnect()
+    {
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = undefined;
+        }
+    }
+
     async stop() {
         _fetch(`${this.API_URL}/components/${this.componentId}/stop`, "GET", null, this.idToken);
         this.isStarted = false;
@@ -209,9 +238,10 @@ export class ComponentSession extends EventTarget {
         if (this.networkId) // network session takes care
             return;
 
-        if (this.eventSource)
+        if (this.eventSource) {
             this.eventSource.close();
-
+            this.eventSource = undefined;
+        }
 
         _fetch(`${this.API_URL}/components/${this.componentId}`, "DELETE", null, this.idToken);
         this.componentId = undefined;
@@ -308,6 +338,14 @@ export class Client extends EventTarget {
     }
 
     _onResize(width, height) {
+
+        if(!this.container)
+        {
+            console.log("container null: ");
+            console.log(this);
+            return;
+        }
+
         this.container.style.width = width;
         this.container.style.height = height;
 
@@ -325,6 +363,7 @@ export class Client extends EventTarget {
         console.log("Disconnecting viewer...");
         if (this.mode === "guac") {
             this.guac.disconnect();
+            BWFLA.unregisterEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
         }
         else if (this.mode === "xpra") {
             this.xpraClient.close();
@@ -335,7 +374,9 @@ export class Client extends EventTarget {
         while (myNode.firstChild) {
             myNode.removeChild(myNode.firstChild);
         }
+        this.activeView.disconnect();
         this.activeView = undefined;
+        this.container = undefined;
         console.log("Viewer disconnected successfully.")
     }
 
@@ -431,8 +472,7 @@ export class Client extends EventTarget {
         this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
         try {
             for (const environmentRequest of environments) {
-                const componentSession = new ComponentSession(this.API_URL, environmentRequest.data, args, this.idToken);
-                await componentSession.startComponent();
+                let componentSession = await ComponentSession.startComponent(this.API_URL, environmentRequest.data, this.idToken);
                 this.sessions.push(componentSession);
                 if (environmentRequest.visualize == true) {
                     this.activeView = componentSession;
@@ -450,6 +490,20 @@ export class Client extends EventTarget {
             this.release();
             throw new Error("starting environment session failed: " + e);
         }
+    }
+
+    load(sessionId, sessionComponents, networkInfo)
+    {
+        for(const sc of sessionComponents)
+        {
+            if(sc.type !== "machine")
+                continue;
+            let session = new ComponentSession(this.API_URL, sc.environmentId, sc.componentId, this.idToken);
+            this.sessions.push(session);
+        }
+
+        this.network = new NetworkSession(this.API_URL, this.idToken);
+        this.network.load(sessionId, this.sessions, networkInfo);
     }
 
     _connectEnvs2(environments, attachId) {
@@ -559,7 +613,7 @@ export class Client extends EventTarget {
     }
 
     // Connects viewer to a running session
-    async connect(view) {
+    async connect(container, view) {
         if (!view && !this.activeView)
             throw new Error("no active view defined");
 
@@ -569,7 +623,9 @@ export class Client extends EventTarget {
         if (view)
             this.activeView = view;
 
-        console.log("Connecting viewer...");
+        this.container = container;
+
+        console.log(`Connecting viewer... @ ${this.container}`);
         try {
             let result = await this.activeView.getControlUrl();
             let connectViewerFunc, controlUrl;
