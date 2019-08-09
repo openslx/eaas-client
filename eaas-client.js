@@ -565,7 +565,10 @@ export class Client extends EventTarget {
         clearInterval(this.keepaliveIntervalId);
 
         if (this.network)
+        {
             this.network.relase();
+            return;
+        }
 
         for (const session of this.sessions) {
             await session.stop()
@@ -624,7 +627,6 @@ export class Client extends EventTarget {
             this.activeView = view;
 
         this.container = container;
-
         console.log(`Connecting viewer... @ ${this.container}`);
         try {
             let result = await this.activeView.getControlUrl();
