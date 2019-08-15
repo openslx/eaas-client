@@ -456,6 +456,7 @@ export class Client extends EventTarget {
      * @returns {*}
      */
     async start(environments, args, attachId) {
+        let componentSession = undefined;
         this.tcpGatewayConfig = args.tcpGatewayConfig;
         if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
             this.xpraConf.xpraEncoding = args.xpraEncoding;
@@ -472,7 +473,7 @@ export class Client extends EventTarget {
         this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
         try {
             for (const environmentRequest of environments) {
-                let componentSession = await ComponentSession.startComponent(this.API_URL, environmentRequest.data, this.idToken);
+                componentSession = await ComponentSession.startComponent(this.API_URL, environmentRequest.data, this.idToken);
                 this.sessions.push(componentSession);
                 if (environmentRequest.visualize == true) {
                     this.activeView = componentSession;
@@ -490,6 +491,7 @@ export class Client extends EventTarget {
             this.release();
             throw new Error("starting environment session failed: " + e);
         }
+        return componentSession;
     }
 
     load(sessionId, sessionComponents, networkInfo)
