@@ -96,7 +96,11 @@ export class NetworkSession extends EventTarget {
         const components = [];
 
         for (const session of sessions) {
-            components.push({ componentId: session.componentId });
+            components.push({
+                componentId: session.componentId,
+                networkLabel: session.networkLabel ? session.networkLabel : undefined,
+                hwAddress: session.hwAddress ? session.hwAddress : "auto",
+            });
             this.sessionComponents.push(session);
         }
 
