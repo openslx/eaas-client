@@ -31,12 +31,12 @@ async function _fetch(url, method = "GET", obj, token = null) {
         headers: header,
         body: body,
     });
-
     if (res.ok) {
         try {
             return await res.json();
+        } catch (e) {
+            return;
         }
-        catch (e) { return; }
     }
 
     throw new Error(`${res.status} @ ${url} : ${await res.text()}`);
@@ -67,16 +67,20 @@ export class NetworkSession extends EventTarget {
     }
 
     async wsConnection() {
-        if (this.networkId == null) {
+        console.log("this.networkId", this.sessionId);
+
+        if (this.sessionId == null) {
             return null;
         }
         const url = `${this.API_URL}/networks/${this.sessionId}/wsConnection`;
-        const res = await _fetch(url, "GET", null, idToken);
+        console.log("this.idToken", this.idToken);
+        const res = await _fetch(url, "GET", null, this.idToken);
+        console.log("res ", res);
 
         if (!res.ok)
             throw new Error(await res.text());
 
-        const url2 = new URL(await res.text(), this.API_URL);
+        const url2 = new URL(res.wsConnection, this.API_URL);
         if (url2.port === "443")
             url2.protocol = "wss";
         return String(url2);
@@ -106,12 +110,11 @@ export class NetworkSession extends EventTarget {
 
         let obj = {
             components: components,
-            hasInternet: options.hasInternet ? true : false,
+            hasInternet: options.enableInternet ? true : false,
             enableDhcp: true,
             hasTcpGateway: options.hasTcpGateway ? true : false,
             tcpGatewayConfig: options.tcpGatewayConfig ? options.tcpGatewayConfig : {}
         };
-
         let result = await _fetch(`${this.API_URL}/networks`, "POST", obj, this.idToken);
         this.sessionId = result.id;
         this.networkTcpInfo = result.networkUrls != null ? result.networkUrls.tcp : null;
@@ -687,18 +690,20 @@ export class Client extends EventTarget {
 
     async getProxyURL(
         {
-            tcpGatewayConfig: config = this.tcpGatewayConfig,
+            serverIP = this.tcpGatewayConfig.serverIp,
+            serverPort = this.tcpGatewayConfig.serverPort,
+            gatewayIP = "dhcp",
             localPort = "8080",
             localIP = "127.0.0.1",
         } = {}) {
         const eaasURL = new URL("web+eaas-proxy:");
         eaasURL.search = encodeURIComponent(JSON.stringify([
             `${localIP}:${localPort}`,
-            await this.wsConnection(),
+            await this.network.wsConnection(),
             "",
-            "dhcp",
-            config.serverIp,
-            config.serverPort,
+            gatewayIP,
+            serverIP,
+            serverPort,
         ]));
         return String(eaasURL);
     };
