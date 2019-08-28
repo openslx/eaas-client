@@ -296,7 +296,7 @@ export class Client extends EventTarget {
             xpraHeight: 480,
             xpraDPI: 96,
             xpraEncoding: "jpeg"
-        }
+        };
 
         // ID for registered this.pollState() with setInterval()
         this.pollStateIntervalId = null;
@@ -884,6 +884,7 @@ export class Client extends EventTarget {
         } else {
             var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra/";
         }
+        let vm = this;
         jQuery.when(
             jQuery.getScript(xpraPath + '/js/lib/zlib.js'),
 
@@ -912,7 +913,7 @@ export class Client extends EventTarget {
                     jQuery.Deferred(function (deferred) {
                         jQuery(deferred.resolve);
                     })).done(function () {
-                        this.xpraClient = loadXpra(xpraUrl, xpraPath, this.xpraConf, this);
+                        vm.xpraClient = loadXpra(xpraUrl, xpraPath, vm.xpraConf, vm);
                     }
                     )
             })
