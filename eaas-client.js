@@ -112,6 +112,8 @@ export class NetworkSession extends EventTarget {
             components: components,
             hasInternet: options.enableInternet ? true : false,
             enableDhcp: true,
+            dhcpNetworkAddress: options.dhcpNetworkAddress,
+            dhcpNetworkMask: options.dhcpNetworkMask,
             hasTcpGateway: options.hasTcpGateway ? true : false,
             tcpGatewayConfig: options.tcpGatewayConfig ? options.tcpGatewayConfig : {}
         };
