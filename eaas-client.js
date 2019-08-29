@@ -98,10 +98,13 @@ export class NetworkSession extends EventTarget {
 
     async startNetwork(sessions, options) {
         const components = [];
+        console.log("!!!!!!!!! sessions", sessions);
 
         for (const session of sessions) {
             components.push({
                 componentId: session.componentId,
+                serverPorts: session.serverPorts,
+                serverIp: session.serverIp,
                 networkLabel: session.networkLabel ? session.networkLabel : undefined,
                 hwAddress: session.hwAddress ? session.hwAddress : "auto",
             });
