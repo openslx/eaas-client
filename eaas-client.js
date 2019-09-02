@@ -239,7 +239,6 @@ export class ComponentSession extends EventTarget {
 
         if (this.peer_connection != null)
             this.peer_connection.close();
-
     }
 
     async stop() {
@@ -1055,7 +1054,7 @@ export class Client extends EventTarget {
 
         const rtcConfig = {
             iceServers: [
-                { urls: "stun:stun.services.mozilla.com" },
+               //  { urls: "stun:stun.services.mozilla.com" },
                 { urls: "stun:stun.l.google.com:19302" }
             ]
         };
@@ -1122,7 +1121,7 @@ export class Client extends EventTarget {
                             console.log(message.data.sdp);
                             const offer = new RTCSessionDescription(message.data);
                             await this.peer_connection.setRemoteDescription(offer);
-                            const answer = await client.peer_connection.createAnswer({ voiceActivityDetection: false });
+                            const answer = await this.peer_connection.createAnswer({ voiceActivityDetection: false });
                             await this.peer_connection.setLocalDescription(answer);
                             console.log("SDP-Answer: ", answer.sdp);
 
