@@ -616,7 +616,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                     controlUrl = data.xpra;
                     _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
                     connectViewerFunc = _this.prepareAndLoadXpra;
-                    _this.initWebRtcAudio(controlUrl);
                     _this.mode = "xpra";
                 }
                 // WebEmulator connector
@@ -635,6 +634,10 @@ EaasClient.Client = function (api_entrypoint, container) {
                 connectViewerFunc.call(_this, controlUrl);
                 console.log("Viewer connected successfully.");
                 _this.isConnected = true;
+
+                if (typeof data.audio !== "undefined")
+                    _this.initWebRtcAudio(data.audio);
+
                 deferred.resolve();
             })
             .fail(function (xhr) {
@@ -698,13 +701,13 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         console.log("Disconnecting viewer...");
 
+        if (_this.rtcPeerConnection != null)
+            _this.rtcPeerConnection.close();
+
         if (_this.mode === "guac") {
             this.guac.disconnect();
         }
         else if (_this.mode === "xpra") {
-            if (_this.peer_connection != null)
-                _this.peer_connection.close();
-
             _this.xpraClient.close();
         }
 
@@ -1007,13 +1010,8 @@ EaasClient.Client = function (api_entrypoint, container) {
 
 
     // WebRTC based sound
-    this.initWebRtcAudio = function (xpraUrl) {
-        //const audioStreamElement = document.createElement('audio');
-        //audioStreamElement.controls = true;
-        //document.documentElement.appendChild(audioStreamElement);
-
+    this.initWebRtcAudio = function (url) {
         const client = _this;
-
         const audioctx = new AudioContext();
 
         const rtcConfig = {
@@ -1024,11 +1022,13 @@ EaasClient.Client = function (api_entrypoint, container) {
         };
 
         console.log("Creating RTC peer connection...");
-        client.peer_connection = new RTCPeerConnection(rtcConfig);
+        client.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
+        client.rtcPeerConnection.connected = false;
 
-        client.peer_connection.onicecandidate = async (event) => {
+        client.rtcPeerConnection.onicecandidate = async (event) => {
             if (event.candidate == null) {
                 console.log("No ICE candidate found!");
+                client.rtcPeerConnection.connected = true;
                 return;
             }
 
@@ -1044,12 +1044,11 @@ EaasClient.Client = function (api_entrypoint, container) {
                 body: JSON.stringify(body)
             };
 
-            await fetch(xpraUrl, request);
+            await fetch(url, request);
         };
 
-
         /*
-        client.peer_connection.ontrack = async (event) => {
+        client.rtcPeerConnection.ontrack = async (event) => {
             console.log("XXXXXXXXXXXXXXXX ONTRACK: ", event);
             console.log("Remote track received");
             audioStreamElement.srcObject = event.streams[0];
@@ -1058,10 +1057,8 @@ EaasClient.Client = function (api_entrypoint, container) {
         };
         */
 
-        client.peer_connection.onaddstream = async (event) => {
-            console.log("XXXXXXXXXXXXXXXX ONADDSTREAM: ", event);
+        client.rtcPeerConnection.onaddstream = async (event) => {
             console.log("Remote stream received");
-            //audioStreamElement.srcObject = event.stream;
             // HACK: Work around https://bugs.chromium.org/p/chromium/issues/detail?id=933677
             new Audio().srcObject = event.stream;
             audioctx.createMediaStreamSource(event.stream)
@@ -1077,16 +1074,16 @@ EaasClient.Client = function (api_entrypoint, container) {
                             console.log("Remote ICE candidate received");
                             console.log(message.data.candidate);
                             const candidate = new RTCIceCandidate(message.data);
-                            await client.peer_connection.addIceCandidate(candidate);
+                            await client.rtcPeerConnection.addIceCandidate(candidate);
                             break;
 
                         case 'sdp':
                             console.log("Remote SDP offer received");
                             console.log(message.data.sdp);
                             const offer = new RTCSessionDescription(message.data);
-                            await client.peer_connection.setRemoteDescription(offer);
-                            const answer = await client.peer_connection.createAnswer({ voiceActivityDetection: false });
-                            await client.peer_connection.setLocalDescription(answer);
+                            await client.rtcPeerConnection.setRemoteDescription(offer);
+                            const answer = await client.rtcPeerConnection.createAnswer();
+                            await client.rtcPeerConnection.setLocalDescription(answer);
                             console.log("SDP-Answer: ", answer.sdp);
 
                             const body = {
@@ -1100,7 +1097,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                             };
 
                             console.log("Sending SDP answer...");
-                            await fetch(xpraUrl, request);
+                            await fetch(url, request);
 
                             break;
 
@@ -1114,10 +1111,12 @@ EaasClient.Client = function (api_entrypoint, container) {
             }
 
             // start next long-polling request
-            fetch(xpraUrl).then(onServerMessage);
+            if (client.rtcPeerConnection.connected)
+                console.log("Stop polling control-messages");
+            else fetch(url).then(onServerMessage);
         };
 
-        fetch(xpraUrl).then(onServerMessage);
+        fetch(url).then(onServerMessage);
     }
 };
 /*
