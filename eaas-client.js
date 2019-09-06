@@ -384,6 +384,9 @@ export class Client extends EventTarget {
             this.xpraClient.close();
         }
 
+        if (this.rtcPeerConnection != null)
+            this.rtcPeerConnection.close();
+
         let myNode = document.getElementById("emulator-container");
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
         while (myNode.firstChild) {
@@ -665,7 +668,6 @@ export class Client extends EventTarget {
             else if (result.xpra) {
                 controlUrl = result.xpra;
                 this.params = strParamsToObject(result.xpra.substring(result.xpra.indexOf("#") + 1));
-                this.initWebRtcAudio(controlUrl);
                 connectViewerFunc = this._prepareAndLoadXpra;
                 this.mode = "xpra";
             }
@@ -682,6 +684,10 @@ export class Client extends EventTarget {
             await connectViewerFunc.call(this, controlUrl);
             console.log("Viewer connected successfully.");
             this.isConnected = true;
+
+            if (typeof data.audio !== "undefined")
+                this.initWebRtcAudio(data.audio);
+
         }
         catch (e) {
             console.error("Connecting viewer failed!");
@@ -1044,11 +1050,11 @@ export class Client extends EventTarget {
 
 
     // WebRTC based sound
+
     initWebRtcAudio (xpraUrl) {
         //const audioStreamElement = document.createElement('audio');
         //audioStreamElement.controls = true;
         //document.documentElement.appendChild(audioStreamElement);
-
 
         const audioctx = new AudioContext();
 
@@ -1060,11 +1066,13 @@ export class Client extends EventTarget {
         };
 
         console.log("Creating RTC peer connection...");
-        this.peer_connection = new RTCPeerConnection(rtcConfig);
 
-        this.peer_connection.onicecandidate = async (event) => {
+        this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
+
+        this.rtcPeerConnection.onicecandidate = async (event) => {
             if (event.candidate == null) {
                 console.log("No ICE candidate found!");
+                client.rtcPeerConnection.connected = true;
                 return;
             }
 
@@ -1080,12 +1088,11 @@ export class Client extends EventTarget {
                 body: JSON.stringify(body)
             };
 
-            await fetch(xpraUrl, request);
+            await fetch(url, request);
         };
 
-
         /*
-        client.peer_connection.ontrack = async (event) => {
+        client.rtcPeerConnection.ontrack = async (event) => {
             console.log("XXXXXXXXXXXXXXXX ONTRACK: ", event);
             console.log("Remote track received");
             audioStreamElement.srcObject = event.streams[0];
@@ -1094,10 +1101,8 @@ export class Client extends EventTarget {
         };
         */
 
-        this.peer_connection.onaddstream = async (event) => {
-            console.log("XXXXXXXXXXXXXXXX ONADDSTREAM: ", event);
+        this.rtcPeerConnection.onaddstream = async (event) => {
             console.log("Remote stream received");
-            //audioStreamElement.srcObject = event.stream;
             // HACK: Work around https://bugs.chromium.org/p/chromium/issues/detail?id=933677
             new Audio().srcObject = event.stream;
             audioctx.createMediaStreamSource(event.stream)
@@ -1113,16 +1118,18 @@ export class Client extends EventTarget {
                             console.log("Remote ICE candidate received");
                             console.log(message.data.candidate);
                             const candidate = new RTCIceCandidate(message.data);
-                            await this.peer_connection.addIceCandidate(candidate);
+
+                            await this.rtcPeerConnection.addIceCandidate(candidate);
                             break;
 
                         case 'sdp':
                             console.log("Remote SDP offer received");
                             console.log(message.data.sdp);
                             const offer = new RTCSessionDescription(message.data);
-                            await this.peer_connection.setRemoteDescription(offer);
-                            const answer = await this.peer_connection.createAnswer({ voiceActivityDetection: false });
-                            await this.peer_connection.setLocalDescription(answer);
+
+                            await this.rtcPeerConnection.setRemoteDescription(offer);
+                            const answer = await this.rtcPeerConnection.createAnswer();
+                            await this.rtcPeerConnection.setLocalDescription(answer);
                             console.log("SDP-Answer: ", answer.sdp);
 
                             const body = {
@@ -1136,7 +1143,7 @@ export class Client extends EventTarget {
                             };
 
                             console.log("Sending SDP answer...");
-                            await fetch(xpraUrl, request);
+                            await fetch(url, request);
 
                             break;
 
@@ -1150,10 +1157,12 @@ export class Client extends EventTarget {
             }
 
             // start next long-polling request
-            fetch(xpraUrl).then(onServerMessage);
+            if (client.rtcPeerConnection.connected)
+                console.log("Stop polling control-messages");
+            else fetch(url).then(onServerMessage);
         };
 
-        fetch(xpraUrl).then(onServerMessage);
+        fetch(url).then(onServerMessage);
     }
 };
 /*
