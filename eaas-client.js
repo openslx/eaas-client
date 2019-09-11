@@ -237,6 +237,9 @@ export class ComponentSession extends EventTarget {
             this.eventSource.close();
             this.eventSource = undefined;
         }
+
+        if (this.peer_connection != null)
+            this.peer_connection.close();
     }
 
     async stop() {
@@ -381,6 +384,9 @@ export class Client extends EventTarget {
         else if (this.mode === "xpra") {
             this.xpraClient.close();
         }
+
+        if (this.rtcPeerConnection != null)
+            this.rtcPeerConnection.close();
 
         let myNode = document.getElementById("emulator-container");
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
@@ -679,6 +685,10 @@ export class Client extends EventTarget {
             await connectViewerFunc.call(this, controlUrl);
             console.log("Viewer connected successfully.");
             this.isConnected = true;
+
+            if (typeof data.audio !== "undefined")
+                this.initWebRtcAudio(data.audio);
+
         }
         catch (e) {
             console.error("Connecting viewer failed!");
@@ -714,7 +724,7 @@ export class Client extends EventTarget {
             serverPort,
         ]));
         return String(eaasURL);
-    };
+    }
 
     async _removeNetworkComponent(netid, compid) {
         console.log("Removing component " + compid + " from network " + netid);
@@ -1040,6 +1050,121 @@ export class Client extends EventTarget {
     };
 
 
+    // WebRTC based sound
+
+    initWebRtcAudio (xpraUrl) {
+        //const audioStreamElement = document.createElement('audio');
+        //audioStreamElement.controls = true;
+        //document.documentElement.appendChild(audioStreamElement);
+
+        const audioctx = new AudioContext();
+
+        const rtcConfig = {
+            iceServers: [
+               //  { urls: "stun:stun.services.mozilla.com" },
+                { urls: "stun:stun.l.google.com:19302" }
+            ]
+        };
+
+        console.log("Creating RTC peer connection...");
+
+        this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
+
+        this.rtcPeerConnection.onicecandidate = async (event) => {
+            if (event.candidate == null) {
+                console.log("No ICE candidate found!");
+                client.rtcPeerConnection.connected = true;
+                return;
+            }
+
+            console.log("Sending ICE candidate to server...");
+
+            const body = {
+                type: 'ice',
+                data: event.candidate
+            };
+
+            const request = {
+                method: 'POST',
+                body: JSON.stringify(body)
+            };
+
+            await fetch(url, request);
+        };
+
+        /*
+        client.rtcPeerConnection.ontrack = async (event) => {
+            console.log("XXXXXXXXXXXXXXXX ONTRACK: ", event);
+            console.log("Remote track received");
+            audioStreamElement.srcObject = event.streams[0];
+            //audioctx.createMediaStreamSource(event.streams[0])
+            //    .connect(audioctx.destination);
+        };
+        */
+
+        this.rtcPeerConnection.onaddstream = async (event) => {
+            console.log("Remote stream received");
+            // HACK: Work around https://bugs.chromium.org/p/chromium/issues/detail?id=933677
+            new Audio().srcObject = event.stream;
+            audioctx.createMediaStreamSource(event.stream)
+                .connect(audioctx.destination);
+        };
+
+        const onServerMessage = async (response) => {
+            const message = await response.json();
+            if (message) {
+                try {
+                    switch (message.type) {
+                        case 'ice':
+                            console.log("Remote ICE candidate received");
+                            console.log(message.data.candidate);
+                            const candidate = new RTCIceCandidate(message.data);
+
+                            await this.rtcPeerConnection.addIceCandidate(candidate);
+                            break;
+
+                        case 'sdp':
+                            console.log("Remote SDP offer received");
+                            console.log(message.data.sdp);
+                            const offer = new RTCSessionDescription(message.data);
+
+                            await this.rtcPeerConnection.setRemoteDescription(offer);
+                            const answer = await this.rtcPeerConnection.createAnswer();
+                            await this.rtcPeerConnection.setLocalDescription(answer);
+                            console.log("SDP-Answer: ", answer.sdp);
+
+                            const body = {
+                                type: 'sdp',
+                                data: answer
+                            };
+
+                            const request = {
+                                method: 'POST',
+                                body: JSON.stringify(body)
+                            };
+
+                            console.log("Sending SDP answer...");
+                            await fetch(url, request);
+
+                            break;
+
+                        default:
+                            console.error("Unsupported message type: " + message.type);
+                    }
+                }
+                catch (error) {
+                    console.log(error);
+                }
+            }
+
+            // start next long-polling request
+            if (client.rtcPeerConnection.connected)
+                console.log("Stop polling control-messages");
+            else fetch(url).then(onServerMessage);
+        };
+
+        fetch(url).then(onServerMessage);
+    }
 };
 /*
  *  Example usage:
