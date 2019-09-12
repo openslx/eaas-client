@@ -1182,7 +1182,7 @@ export class Client extends EventTarget {
  *      BWFLA.registerEventCallback(<target-2>, 'resize', resizeIFrame);
  */
 
-var BWFLA = BWFLA || {};
+export var BWFLA = BWFLA || {};
 
 // Method to attach a callback to an event
 BWFLA.registerEventCallback = function (target, eventName, callback) {
