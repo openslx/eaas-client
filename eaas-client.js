@@ -686,8 +686,8 @@ export class Client extends EventTarget {
             console.log("Viewer connected successfully.");
             this.isConnected = true;
 
-            if (typeof data.audio !== "undefined")
-                this.initWebRtcAudio(data.audio);
+            if (typeof result.audio !== "undefined")
+                this.initWebRtcAudio(result.audio);
 
         }
         catch (e) {
