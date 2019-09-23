@@ -712,7 +712,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         var myNode = document.getElementById("emulator-container");
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
-        while (myNode.firstChild) {
+        while (myNode && myNode.firstChild) {
             myNode.removeChild(myNode.firstChild);
         }
 
