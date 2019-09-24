@@ -792,12 +792,12 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
     };
 
-    this.stopEnvironment = async function () {
+    this.stopEnvironment = async function (keepSession = false) {
 
         if (!_this.isStarted)
             return;
 
-        if (_this.pollStateIntervalId)
+        if (!keepSession && _this.pollStateIntervalId)
             clearInterval(_this.pollStateIntervalId);
 
         if(_this.detached === false) {
