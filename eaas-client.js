@@ -5,12 +5,11 @@ var EaasClient = EaasClient || {};
  */
 
 EaasClient.Client = function (api_entrypoint, container) {
-
-
-
+    
     // Clean up on window close
     window.onbeforeunload = function () {
         if(_this.deleteOnUnload)
+        console.log("unload");
         this.release();
     }.bind(this);
 
@@ -820,6 +819,8 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.release = async function () {
         if (_this.released)
             return;
+
+        console.log("release");
 
         _this.released = true;
         _this.envsComponentsData = [];
