@@ -5,12 +5,11 @@ var EaasClient = EaasClient || {};
  */
 
 EaasClient.Client = function (api_entrypoint, container) {
-    
+
     // Clean up on window close
     window.onbeforeunload = function () {
         if(_this.deleteOnUnload)
-        console.log("unload");
-        this.release();
+            this.release();
     }.bind(this);
 
     // default xpra values
@@ -792,7 +791,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     };
 
     this.stopEnvironment = async function (keepSession = false) {
-
+        let result = null;
         if (!_this.isStarted)
             return;
 
@@ -800,16 +799,19 @@ EaasClient.Client = function (api_entrypoint, container) {
             clearInterval(_this.pollStateIntervalId);
 
         if(_this.detached === false) {
-            $.ajax({
-                type: "GET",
-                url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
-                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                async: true,
+            let url = API_URL + formatStr("/components/{0}/stop", _this.componentId);
+            let _res = fetch(url, {method: 'GET', 
+                headers:
+                localStorage.id_token ? {"authorization" : `Bearer ${localStorage.id_token}`} : {},
             });
+            let res = await _res;
+            try {
+                result = await res.json();
+            } catch(error) {result = null;}
         }
         _this.isStarted = false;
-
         $(container).empty();
+        return result;
     };
 
     this.clearTimer = function () {
