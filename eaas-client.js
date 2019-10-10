@@ -191,6 +191,10 @@ EaasClient.Client = function (api_entrypoint, container) {
         const res = await fetch(url, {headers:
             localStorage.id_token ? {"authorization" : `Bearer ${localStorage.id_token}`} : {},
         });
+        
+        if (!res.ok)
+            throw new Error(await res.text());
+
         const url2 = new URL(await res.text(), API_URL);
         if (url2.port === "443") url2.protocol = "wss";
         return String(url2);
@@ -371,6 +375,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 data: JSON.stringify({
                     components: components,
                     hasInternet: args.hasInternet ? true : false,
+                    enableDhcp : true,
                     hasTcpGateway: args.hasTcpGateway ? true : false,
                     tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
                 }),
@@ -394,7 +399,6 @@ EaasClient.Client = function (api_entrypoint, container) {
         var connectEnvs = function(environments) {
             var idsData = [];
             for (let i = 0; i < environments.length; i++) {
-                console.log("starting environment: " + environments[i].data.environment);
                 $.ajax({
                     type: "POST",
                     url: API_URL + "/components",
@@ -403,7 +407,6 @@ EaasClient.Client = function (api_entrypoint, container) {
                         envData.env = environments[i];
                         idsData.push(envData);
                         if(environments[i].visualize == true){
-                            console.log("_this.componentId "+ _this.componentId);
                             if(_this.componentId != null) {
                                 console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
                                 return;
@@ -440,7 +443,6 @@ EaasClient.Client = function (api_entrypoint, container) {
         if (environments.length > 1 || args.enableNetwork) {
             connectEnvs(environments)
         } else {
-            console.log("Starting environment " + environments[0].data.environment + "...");
             $.ajax({
                 type: "POST",
                 url: API_URL + "/components",
@@ -670,7 +672,11 @@ EaasClient.Client = function (api_entrypoint, container) {
             throw new Error("Session cannot be detached!");
         }
         _this.detached = true;
-        window.onbeforeunload = () => void this.disconnect();
+        window.onbeforeunload = () => {};
+
+       _this.disconnect();
+        if (_this.pollStateIntervalId)
+              clearInterval(_this.pollStateIntervalId);
     };
 
     this.getProxyURL = async function ({
@@ -683,7 +689,7 @@ EaasClient.Client = function (api_entrypoint, container) {
             `${localIP}:${localPort}`,
             await this.wsConnection(),
             "",
-            `${config.gwPrivateIp}/${config.gwPrivateMask}`,
+            "dhcp",
             config.serverIp,
             config.serverPort,
         ]));
@@ -713,7 +719,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         var myNode = document.getElementById("emulator-container");
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
-        while (myNode.firstChild) {
+        while (myNode && myNode.firstChild) {
             myNode.removeChild(myNode.firstChild);
         }
 
@@ -793,12 +799,12 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
     };
 
-    this.stopEnvironment = function () {
+    this.stopEnvironment = async function (keepSession = false) {
 
         if (!_this.isStarted)
             return;
 
-        if (_this.pollStateIntervalId)
+        if (!keepSession && _this.pollStateIntervalId)
             clearInterval(_this.pollStateIntervalId);
 
         if(_this.detached === false) {
@@ -806,7 +812,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 type: "GET",
                 url: API_URL + formatStr("/components/{0}/stop", _this.componentId),
                 headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                async: false,
+                async: true,
             });
         }
         _this.isStarted = false;
@@ -818,8 +824,8 @@ EaasClient.Client = function (api_entrypoint, container) {
         clearInterval(this.keepaliveIntervalId);
     };
 
-    this.release = function () {
-        if(_this.released)
+    this.release = async function () {
+        if (_this.released)
             return;
 
         _this.released = true;
@@ -827,7 +833,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         _this.abort = true;
         this.clearTimer();
 
-        if(_this.eventSource)
+        if (_this.eventSource)
             _this.eventSource.close();
 
         var result = this.disconnect();
@@ -835,20 +841,21 @@ EaasClient.Client = function (api_entrypoint, container) {
             continue;  // Wait for completion!
         }
 
-        this.stopEnvironment();
+        await this.stopEnvironment();
 
-        if(_this.detached === false)
-        {
-            if(!_this.componentId)
+        if (_this.detached === false) {
+            if (!_this.componentId)
                 return;
 
-            $.ajax({
+            return $.ajax({
                 type: "DELETE",
                 url: API_URL + formatStr("/components/{0}", _this.componentId),
-                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                async: false,
+                headers: localStorage.getItem('id_token') ? {"Authorization": "Bearer " + localStorage.getItem('id_token')} : {},
+                async: true,
             });
         }
+
+
     };
 
     this.sendEsc = function() {
@@ -856,13 +863,31 @@ EaasClient.Client = function (api_entrypoint, container) {
         this.guac.sendKeyEvent(0, 0xff1b);
     };
 
-    this.sendCtrlAltDel = function() {
-        this.guac.sendKeyEvent(1, 0xFFE9);
-        this.guac.sendKeyEvent(1, 0xFFE3);
-        this.guac.sendKeyEvent(1, 0xFFFF);
-        this.guac.sendKeyEvent(0, 0xFFE9);
-        this.guac.sendKeyEvent(0, 0xFFE3);
-        this.guac.sendKeyEvent(0, 0xFFFF);
+
+    this.sendCtrlAltDel = async function()
+    {
+        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
+         if (ctrlKey) {
+             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Control", keyCode: 17, bubbles: true}));
+             await new Promise(r => setTimeout(r, 100));
+         }
+         if (altKey) {
+             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Alt", keyCode: 18, bubbles: true}));
+             await new Promise(r => setTimeout(r, 100));
+         }
+         el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+         await new Promise(r => setTimeout(r, 100));
+         el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+         if (altKey) {
+             await new Promise(r => setTimeout(r, 100));
+             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Alt", keyCode: 18, bubbles: true}));
+         }
+         if (ctrlKey) {
+             await new Promise(r => setTimeout(r, 100));
+             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Control", keyCode: 17, bubbles: true}));
+         }
+        };
+        pressKey("Delete", 46, {altKey: true, ctrlKey: true, metaKey: true})
     };
 
     this.snapshot = function (postObj, onChangeDone, errorFn) {
