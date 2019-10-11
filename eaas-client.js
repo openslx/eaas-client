@@ -1041,7 +1041,6 @@ EaasClient.Client = function (api_entrypoint, container) {
 
         const rtcConfig = {
             iceServers: [
-                { urls: "stun:stun.services.mozilla.com" },
                 { urls: "stun:stun.l.google.com:19302" }
             ]
         };
