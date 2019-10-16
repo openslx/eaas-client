@@ -1142,9 +1142,13 @@ EaasClient.Client = function (api_entrypoint, container) {
         catch(error) {}
 
             // start next long-polling request
+            /*
             if (client.rtcPeerConnection.connected)
                 console.log("Stop polling control-messages");
-            else fetch(url).then(onServerMessage);
+            else 
+            */
+            
+            fetch(url).then(onServerMessage);
 
         };
 
