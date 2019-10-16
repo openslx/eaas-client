@@ -1090,6 +1090,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         };
 
         const onServerMessage = async (response) => {
+            try {
             const message = await response.json();
             if (message) {
                 try {
@@ -1133,11 +1134,15 @@ EaasClient.Client = function (api_entrypoint, container) {
                     console.log(error);
                 }
             }
-
+            
+        }
+        catch {}
+        
             // start next long-polling request
             if (client.rtcPeerConnection.connected)
                 console.log("Stop polling control-messages");
             else fetch(url).then(onServerMessage);
+
         };
 
         fetch(url).then(onServerMessage);
