@@ -853,7 +853,7 @@ export class Client extends EventTarget {
     snapshot(postObj, onChangeDone, errorFn) {
         $.ajax({
             type: "POST",
-            url: this.API_URL + formatStr("/components/{0}/snapshot", this.componentId),
+            url: this.API_URL + formatStr("/components/{0}/snapshot", this.activeView.componentId),
             data: JSON.stringify(postObj),
             contentType: "application/json",
             headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
