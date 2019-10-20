@@ -1162,9 +1162,9 @@ export class Client extends EventTarget {
         catch(error) {}
 
             // start next long-polling request
-            if (this.rtcPeerConnection.connected)
-                console.log("Stop polling control-messages");
-            else 
+            // if (this.rtcPeerConnection.connected)
+            //     console.log("Stop polling control-messages");
+            // else 
             fetch(url).then(onServerMessage);
 
         };
