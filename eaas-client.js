@@ -1073,7 +1073,7 @@ export class Client extends EventTarget {
         this.rtcPeerConnection.onicecandidate = async (event) => {
             if (event.candidate == null) {
                 console.log("No ICE candidate found!");
-                client.rtcPeerConnection.connected = true;
+                this.rtcPeerConnection.connected = true;
                 return;
             }
 
@@ -1162,7 +1162,7 @@ export class Client extends EventTarget {
         catch(error) {}
 
             // start next long-polling request
-            if (client.rtcPeerConnection.connected)
+            if (this.rtcPeerConnection.connected)
                 console.log("Stop polling control-messages");
             else 
             fetch(url).then(onServerMessage);
