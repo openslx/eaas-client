@@ -787,7 +787,7 @@ export class Client extends EventTarget {
             console.error("Checkpointing failed!");
             throw undefined;
         }
-    };
+    }
 
     downloadPrint(label) {
         return `${this.API_URL}/components/${this.componentId}/downloadPrintJob?label=${encodeURI(label)}`;
@@ -805,7 +805,7 @@ export class Client extends EventTarget {
             if (errorFn)
                 errorFn(xhr);
         });
-    };
+    }
 
     stopEnvironment() {
         if (!this.isStarted)
@@ -1061,7 +1061,7 @@ export class Client extends EventTarget {
 
         const rtcConfig = {
             iceServers: [
-               //  { urls: "stun:stun.services.mozilla.com" },
+
                 { urls: "stun:stun.l.google.com:19302" }
             ]
         };
@@ -1111,6 +1111,7 @@ export class Client extends EventTarget {
         };
 
         const onServerMessage = async (response) => {
+            try {
             const message = await response.json();
             if (message) {
                 try {
@@ -1156,11 +1157,16 @@ export class Client extends EventTarget {
                     console.log(error);
                 }
             }
+            
+        }
+        catch(error) {}
 
             // start next long-polling request
-            if (client.rtcPeerConnection.connected)
-                console.log("Stop polling control-messages");
-            else fetch(url).then(onServerMessage);
+            // if (client.rtcPeerConnection.connected)
+            //    console.log("Stop polling control-messages");
+            // else 
+            fetch(url).then(onServerMessage);
+
         };
 
         fetch(url).then(onServerMessage);
