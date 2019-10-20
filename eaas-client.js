@@ -1052,7 +1052,7 @@ export class Client extends EventTarget {
 
     // WebRTC based sound
 
-    initWebRtcAudio (xpraUrl) {
+    initWebRtcAudio (url) {
         //const audioStreamElement = document.createElement('audio');
         //audioStreamElement.controls = true;
         //document.documentElement.appendChild(audioStreamElement);
