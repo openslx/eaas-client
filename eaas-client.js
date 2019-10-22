@@ -1067,13 +1067,11 @@ export class Client extends EventTarget {
         };
 
         console.log("Creating RTC peer connection...");
-
         this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
 
         this.rtcPeerConnection.onicecandidate = async (event) => {
-            if (event.candidate == null) {
-                console.log("No ICE candidate found!");
-                this.rtcPeerConnection.connected = true;
+            if (!event.candidate) {
+                console.log("ICE candidate exchange finished!");
                 return;
             }
 
@@ -1110,11 +1108,19 @@ export class Client extends EventTarget {
                 .connect(audioctx.destination);
         };
 
+        const onServerError = (reason) => {
+            console.log("Stop polling control-messages! Reason:", reason);
+        };
+
         const onServerMessage = async (response) => {
+            if (!response.ok) {
+                console.log("Stop polling control-messages, server returned:", response.status);
+                return;
+            }
+
             try {
-            const message = await response.json();
-            if (message) {
-                try {
+                const message = await response.json();
+                if (message) {
                     switch (message.type) {
                         case 'ice':
                             console.log("Remote ICE candidate received");
@@ -1149,24 +1155,21 @@ export class Client extends EventTarget {
 
                             break;
 
+                        case 'eos':
+                            console.log("Stop polling control-messages");
+                            return;
+
                         default:
                             console.error("Unsupported message type: " + message.type);
                     }
                 }
-                catch (error) {
-                    console.log(error);
-                }
             }
-            
-        }
-        catch(error) {}
+            catch (error) {
+                console.log(error);
+            }
 
             // start next long-polling request
-            // if (this.rtcPeerConnection.connected)
-            //     console.log("Stop polling control-messages");
-            // else 
-            fetch(url).then(onServerMessage);
-
+            fetch(url).then(onServerMessage, onServerError);
         };
 
         fetch(url).then(onServerMessage);
