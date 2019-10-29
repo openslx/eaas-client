@@ -940,16 +940,21 @@ EaasClient.Client = function (api_entrypoint, container) {
         }
         jQuery.when(
             jQuery.getScript(xpraPath + '/js/lib/zlib.js'),
+            $("#emulator-container").append('<div id="screen" style="width: 100%; height:100%;">        <div id="float_menu">            <ul class="Menu -horizontal">                <li class="-hasSubmenu -noChevron">                </li>                <li class="-hasSubmenu -noChevron">                    <a href="#" title="Open Windows" data-icon="filter"></a>                    <ul id="open_windows_list">                    </ul>                </li>                <li class="-hasSubmenu -noChevron">                    <a href="#" id="fullscreen_button" title="Fullscreen" data-icon="fullscreen"></a>                </li>                <li class="-hasSubmenu -noChevron">                    <a href="#" id="sound_button" title="Audio" data-icon="volume_off"></a>                </li>            </ul>            <div id="float_tray"  class="menu-divright"></div>        </div>    </div>'),
 
             jQuery.getScript(xpraPath + '/js/lib/aurora/aurora.js'),
             jQuery.getScript(xpraPath + '/js/lib/lz4.js'),
             jQuery.getScript(xpraPath + '/js/lib/jquery-ui.js'),
             jQuery.getScript(xpraPath + '/js/lib/jquery.ba-throttle-debounce.js'),
+            jQuery.getScript(xpraPath + '/js/lib/es6-shim.js'),
+
             jQuery.Deferred(function (deferred) {
                 jQuery(deferred.resolve);
             })).done(function () {
             jQuery.when(
                 jQuery.getScript(xpraPath + '/js/lib/bencode.js'),
+                jQuery.getScript(xpraPath + '/js/lib/jsmpeg.js'),
+                jQuery.getScript(xpraPath + '/js/lib/brotli_decode.js'),
                 jQuery.getScript(xpraPath + '/js/lib/forge.js'),
                 jQuery.getScript(xpraPath + '/js/lib/wsworker_check.js'),
                 jQuery.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
@@ -962,6 +967,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                 jQuery.getScript(xpraPath + '/js/Window.js'),
                 jQuery.getScript(xpraPath + '/js/Protocol.js'),
                 jQuery.getScript(xpraPath + '/js/Client.js'),
+                jQuery.getScript(xpraPath + '/js/Menu.js'),
+                jQuery.getScript(xpraPath + '/js/Menu-custom.js'),
 
                 jQuery.Deferred(function (deferred) {
                     jQuery(deferred.resolve);

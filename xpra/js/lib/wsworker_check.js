@@ -1,1 +1,1 @@
-self.addEventListener("message",function(e){var data=e.data;switch(data.cmd){case"check":try{if(WebSocket){self.postMessage({result:true})}else{self.postMessage({result:false})}}catch(err){self.postMessage({result:false})}break;default:console.log("worker got unknown message: "+data.cmd)}},false);
+self.addEventListener("message",function(e){var data=e.data;switch(data.cmd){case"check":try{WebSocket?self.postMessage({result:!0}):self.postMessage({result:!1})}catch(err){self.postMessage({result:!1})}break;default:console.log("worker got unknown message: "+data.cmd)}},!1);
