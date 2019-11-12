@@ -950,6 +950,10 @@ export class Client extends EventTarget {
         this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
         var displayElement = this.guac.getDisplay().getElement();
 
+        this.guac.onerror = function(status) {
+            console.log("GUAC-ERROR-RESPONSE:", status.code, " -> ", status.message);
+        }
+
         hideClientCursor(this.guac);
         this.container.insertBefore(displayElement, this.container.firstChild);
 
