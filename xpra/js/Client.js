@@ -19,13 +19,17 @@ XpraClient.prototype.init_settings = function (container) {
         me.on_mousescroll(e)
     }
 
-    this.connected = !1, this.desktop_width = 0, this.desktop_height = 0, this.server_remote_logging = !1, this.server_start_time = -1, this.client_start_time = new Date, this.capabilities = {}, this.RGB_FORMATS = ["RGBX", "RGBA"], this.disconnect_reason = null, this.audio = null, this.audio_enabled = !1, this.audio_mediasource_enabled = null != MediaSourceUtil.getMediaSourceClass(), this.audio_aurora_enabled = "undefined" != typeof AV && null != AV && null != AV.Decoder && null != AV.Player.fromXpraSource, this.audio_httpstream_enabled = !0, this.audio_codecs = {}, this.audio_framework = null, this.audio_aurora_ctx = null, this.audio_codec = null, this.audio_context = Utilities.getAudioContext(), this.audio_state = null, this.aurora_codecs = {}, this.mediasource_codecs = {}, this.encryption = !1, this.encryption_key = null, this.cipher_in_caps = null, this.cipher_out_caps = null, this.browser_language = Utilities.getFirstBrowserLanguage(), this.browser_language_change_embargo_time = 0, this.key_layout = null, this.mousedown_event = null, this.last_mouse_x = null, this.last_mouse_y = null, this.wheel_delta_x = 0, this.wheel_delta_y = 0, this.mouse_grabbed = !1, this.clipboard_datatype = null, this.clipboard_buffer = "", this.clipboard_server_buffers = {}, this.clipboard_pending = !1, this.clipboard_targets = ["UTF8_STRING", "TEXT", "STRING", "text/plain"], CLIPBOARD_IMAGES && navigator.clipboard && navigator.clipboard.write && this.clipboard_targets.push("image/png"), this.remote_printing = !1, this.remote_file_transfer = !1, this.remote_open_files = !1, this.hello_timer = null, this.info_timer = null, this.info_request_pending = !1, this.server_last_info = {}, this.ping_timeout_timer = null, this.ping_grace_timer = null, this.ping_timer = null, this.last_ping_server_time = 0, this.last_ping_local_time = 0, this.last_ping_echoed_time = 0, this.server_ping_latency = 0, this.client_ping_latency = 0, this.server_load = null, this.server_ok = !1, this.queue_draw_packets = !1, this.dQ = [], this.dQ_interval_id = null, this.process_interval = 4, this.server_display = "", this.server_platform = "", this.server_resize_exact = !1, this.server_screen_sizes = [], this.server_is_desktop = !1, this.server_is_shadow = !1, this.server_readonly = !1, this.server_connection_data = !1, this.xdg_menu = null, this.id_to_window = {}, this.ui_events = 0, this.pending_redraw = [], this.draw_pending = 0, this.topwindow = null, this.topindex = 0, this.focus = -1, jQuery("#screen").mousedown(function (e) {
-        me.on_mousedown(e)
-    }), jQuery("#screen").mouseup(function (e) {
-        me.on_mouseup(e)
-    }), jQuery("#screen").mousemove(function (e) {
-        me.on_mousemove(e)
-    });
+    this.connected = !1, this.desktop_width = 0, this.desktop_height = 0, this.server_remote_logging = !1, this.server_start_time = -1, this.client_start_time = new Date, this.capabilities = {}, this.RGB_FORMATS = ["RGBX", "RGBA"], this.disconnect_reason = null, this.audio = null, this.audio_enabled = !1, this.audio_mediasource_enabled = null != MediaSourceUtil.getMediaSourceClass(), this.audio_aurora_enabled = "undefined" != typeof AV && null != AV && null != AV.Decoder && null != AV.Player.fromXpraSource, this.audio_httpstream_enabled = !0, this.audio_codecs = {}, this.audio_framework = null, this.audio_aurora_ctx = null, this.audio_codec = null, this.audio_context = Utilities.getAudioContext(), this.audio_state = null, this.aurora_codecs = {}, this.mediasource_codecs = {}, this.encryption = !1, this.encryption_key = null, this.cipher_in_caps = null, this.cipher_out_caps = null, this.browser_language = Utilities.getFirstBrowserLanguage(), this.browser_language_change_embargo_time = 0, this.key_layout = null, this.mousedown_event = null, this.last_mouse_x = null, this.last_mouse_y = null, this.wheel_delta_x = 0, this.wheel_delta_y = 0, this.mouse_grabbed = !1, this.clipboard_datatype = null, this.clipboard_buffer = "", this.clipboard_server_buffers = {}, this.clipboard_pending = !1, this.clipboard_targets = ["UTF8_STRING", "TEXT", "STRING", "text/plain"], CLIPBOARD_IMAGES && navigator.clipboard && navigator.clipboard.write && this.clipboard_targets.push("image/png"), this.remote_printing = !1, this.remote_file_transfer = !1, this.remote_open_files = !1, this.hello_timer = null, this.info_timer = null, this.info_request_pending = !1, this.server_last_info = {}, this.ping_timeout_timer = null, this.ping_grace_timer = null, this.ping_timer = null, this.last_ping_server_time = 0, this.last_ping_local_time = 0, this.last_ping_echoed_time = 0, this.server_ping_latency = 0, this.client_ping_latency = 0, this.server_load = null, this.server_ok = !1, this.queue_draw_packets = !1, this.dQ = [], this.dQ_interval_id = null, this.process_interval = 4, this.server_display = "", this.server_platform = "", this.server_resize_exact = !1, this.server_screen_sizes = [], this.server_is_desktop = !1, this.server_is_shadow = !1, this.server_readonly = !1, this.server_connection_data = !1, this.xdg_menu = null, this.id_to_window = {}, this.ui_events = 0, this.pending_redraw = [], this.draw_pending = 0, this.topwindow = null, this.topindex = 0, this.focus = -1,
+        jQuery("#screen").mousedown(function (e) {
+            me.on_mousedown(e)
+        }),
+        jQuery("#screen").mouseup(function (e) {
+            me.on_mouseup(e)
+        }),
+        jQuery("#screen").mousemove(function (e) {
+            me.on_mousemove(e)
+        });
+
     var me = this, div = document.getElementById("screen");
     Utilities.isEventSupported("wheel") ? div.addEventListener("wheel", on_mousescroll, !1) : Utilities.isEventSupported("mousewheel") ? div.addEventListener("mousewheel", on_mousescroll, !1) : Utilities.isEventSupported("DOMMouseScroll") && div.addEventListener("DOMMouseScroll", on_mousescroll, !1)
 }, XpraClient.prototype.send = function () {
@@ -339,7 +343,7 @@ XpraClient.prototype.init_settings = function (container) {
     }, this._update_capabilities(this.cipher_in_caps), this.protocol.set_cipher_in(this.cipher_in_caps, this.encryption_key)), this.start_new_session && this._update_capabilities({"start-new-session": this.start_new_session})
 }, XpraClient.prototype._make_hello = function () {
     var selections = null;
-    navigator.clipboard && navigator.clipboard.readText && navigator.clipboard.writeText ? (selections = ["CLIPBOARD"], this.log("using new navigator.clipboard")) : (selections = ["CLIPBOARD", "PRIMARY"], this.log("legacy clipboard")), this.desktop_width = this.container.clientWidth, this.desktop_height = this.container.clientHeight, this.key_layout = this._get_keyboard_layout(), this._update_capabilities({
+    navigator.clipboard && navigator.clipboard.readText && navigator.clipboard.writeText ? (selections = ["CLIPBOARD"], this.log("using new navigator.clipboard")) : (selections = ["CLIPBOARD", "PRIMARY"], this.log("legacy clipboard")), this.desktop_width = 1024, this.desktop_height = 800, this.key_layout = this._get_keyboard_layout(), this._update_capabilities({
         auto_refresh_delay: 500,
         randr_notify: !0,
         "sound.server_driven": !0,
@@ -425,9 +429,13 @@ XpraClient.prototype.init_settings = function (container) {
     var mx = e.clientX + jQuery(document).scrollLeft(), my = e.clientY + jQuery(document).scrollTop();
     isNaN(mx) || isNaN(my) ? isNaN(this.last_mouse_x) || isNaN(this.last_mouse_y) ? (mx = 0, my = 0) : (mx = this.last_mouse_x, my = this.last_mouse_y) : (this.last_mouse_x = mx, this.last_mouse_y = my);
     var mbutton = 0;
+
+    //changed
+    let screenOffset = jQuery("#screen").offset();
+
     return "which" in e ? mbutton = Math.max(0, e.which) : "button" in e && (mbutton = Math.max(0, e.button) + 1), {
-        x: mx,
-        y: my,
+        x: mx - screenOffset.left,
+        y: my - screenOffset.top,
         button: mbutton
     }
 }, XpraClient.prototype.on_mousemove = function (e) {
@@ -442,8 +450,17 @@ XpraClient.prototype.init_settings = function (container) {
     ctx.do_window_mouse_move(e, window)
 }, XpraClient.prototype.do_window_mouse_move = function (e, window) {
     if (!this.server_readonly && !this.mouse_grabbed && this.connected) {
-        var mouse = this.getMouse(e, window), x = Math.round(mouse.x), y = Math.round(mouse.y),
+        var mouse = this.getMouse(e, this.topwindow),
             modifiers = this._keyb_get_modifiers(e), buttons = [], wid = 0;
+        // let screenOffset = jQuery("#screen").offset();
+        var x = mouse.x; //- screenOffset.left;
+        var y = mouse.y; //- screenOffset.top;
+        // console.log("jQuery #emulator-container x", x);
+        // console.log("jQuery #emulator-container y", y);
+
+        x = Math.round(x);
+        y = Math.round(y);
+        // y = Math.round(mouse.y)
         window && (wid = window.wid), this.send(["pointer-position", wid, [x, y], modifiers, buttons])
     }
 }, XpraClient.prototype._window_mouse_down = function (ctx, e, window) {

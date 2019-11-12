@@ -67,11 +67,15 @@ function XpraWindow(client, canvas_state, wid, x, y, w, h, metadata, override_re
     })), this.screen_resized(), this.updateCSSGeometry(), this.update_metadata(metadata)
 
     me._set_decorated(false);
+    // me.handle_resized();
     me.move(0,0);
+    // me.screen_resized();
     const float_menu = $("#float_menu");
     if (float_menu.length > 0) {
         float_menu.hide();
     }
+    // if(client._get_desktop_size()[1])
+    // window.dispatchEvent(new Event('resize'));
 }
 
 XpraWindow.prototype._init_2d_canvas = function () {

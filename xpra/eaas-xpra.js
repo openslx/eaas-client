@@ -286,7 +286,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
         clog("debug enabled for:", debug_categories);
 
         // create the client
-        var client = new XpraClient('screen');
+        var client = new XpraClient('emulator-container');
         client.debug_categories = debug_categories;
         client.remote_logging = remote_logging;
         client.sharing = sharing;
@@ -360,7 +360,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
 
         // sound support
         if(sound) {
-            client.audio_enabled = true;
+            client.audio_enabled = false;
             clog("sound enabled, audio codec string: "+audio_codec);
             if(audio_codec && audio_codec.includes(":")) {
                 var acparts = audio_codec.split(":");
@@ -729,7 +729,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
 
         client = init_client();
         client.connect();
-
+        window.client = client;
         //from now on, send log and debug to client function
         //which may forward it to the server once connected:
         clog = function() {
