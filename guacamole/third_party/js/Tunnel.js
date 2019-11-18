@@ -157,7 +157,9 @@ Guacamole.HTTPTunnel = function(tunnelURL) {
     var POLLING_DISABLED    = 0;
 
     // Default to polling - will be turned off automatically if not needed
-    var pollingMode = POLLING_ENABLED;
+    // HACK: Detecting whether polling is required seems to not really work
+    // (and polling is not needed in any browsers anymore anyway).
+    var pollingMode = POLLING_DISABLED;
 
     var sendingMessages = false;
     var outputMessageBuffer = "";
