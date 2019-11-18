@@ -67,15 +67,12 @@ export class NetworkSession extends EventTarget {
     }
 
     async wsConnection() {
-        console.log("this.networkId", this.sessionId);
 
         if (this.sessionId == null) {
             return null;
         }
         const url = `${this.API_URL}/networks/${this.sessionId}/wsConnection`;
-        console.log("this.idToken", this.idToken);
         const res = await _fetch(url, "GET", null, this.idToken);
-        console.log("res ", res);
 
         if (!res.ok)
             throw new Error(await res.text());
@@ -98,7 +95,6 @@ export class NetworkSession extends EventTarget {
 
     async startNetwork(sessions, options) {
         const components = [];
-        console.log("!!!!!!!!! sessions", sessions);
 
         for (const session of sessions) {
             components.push({
@@ -112,6 +108,7 @@ export class NetworkSession extends EventTarget {
         }
 
         let obj = {
+            networkEnvironmentId: options.envId ? options.envId : undefined,
             components: components,
             hasInternet: options.enableInternet ? true : false,
             enableDhcp: true,
