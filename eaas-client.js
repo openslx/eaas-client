@@ -214,6 +214,11 @@ export class ComponentSession extends EventTarget {
         return _fetch(`${this.API_URL}/components/${this.componentId}/controlurls`, "GET", undefined, this.idToken);
     }
 
+    getNetworkId()
+    {
+        return this.networkId;
+    }
+
     async keepalive() {
         if (this.networkId) // if part of an network, network session will take care
             return;
@@ -329,10 +334,13 @@ export class Client extends EventTarget {
     async _pollState() {
         if (this.network) {
             this.network.keepalive();
-            return;
         }
 
         for (const session of this.sessions) {
+
+            if(session.getNetworkId())
+                continue;
+
             let result = await session.getEmulatorState();
             if (!result)
                 continue;
