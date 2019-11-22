@@ -220,7 +220,7 @@ export class ComponentSession extends EventTarget {
     }
 
     async keepalive() {
-        if (this.networkId) // if part of an network, network session will take care
+        if (this.networkId && !this.forceKeepalive) // if part of an network, network session will take care
             return;
 
         const url = `${this.API_URL}/components/${this.componentId}/keepalive`;
@@ -338,7 +338,7 @@ export class Client extends EventTarget {
 
         for (const session of this.sessions) {
 
-            if(session.getNetworkId())
+            if(session.getNetworkId() && !session.forceKeepalive)
                 continue;
 
             let result = await session.getEmulatorState();
@@ -518,12 +518,31 @@ export class Client extends EventTarget {
         return componentSession;
     }
 
+    async attachNewEnv(environmentRequest, session) {
+        const componentSession = await ComponentSession.startComponent(this.API_URL, environmentRequest, this.idToken);
+        this._attachToSwitch({id: componentSession.componentId}, session.sessionId);
+        componentSession.type = "machine";
+        session.components.push(componentSession);
+        session.network.components.push({componentId: componentSession.componentId, networkLabel: "Temp Client"});
+        session.componentIdToInitialize = componentSession.componentId;
+        componentSession.forceKeepalive = true;
+        this.sessions.push(componentSession);
+        console.log(this.sessions);
+        return session;
+    }
+
     load(sessionId, sessionComponents, networkInfo)
     {
+
         for(const sc of sessionComponents)
         {
+
             if(sc.type !== "machine")
                 continue;
+
+            if (this.sessions.filter((sessionComp) => sessionComp.componentId === sc.componentId).length > 0)
+                continue;
+            
             let session = new ComponentSession(this.API_URL, sc.environmentId, sc.componentId, this.idToken);
             this.sessions.push(session);
         }
@@ -564,7 +583,6 @@ export class Client extends EventTarget {
     }
 
     _attachToSwitch(clientData, networkID) {
-        // console.log("clientData.id " + clientData.id);
         $.ajax({
             type: "POST",
             url: this.API_URL + "/networks/" + networkID + "/addComponentToSwitch",
@@ -573,11 +591,10 @@ export class Client extends EventTarget {
             }),
             contentType: "application/json",
             headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
-        }).then(function (status, xhr) {
+        }).then( (status, xhr) =>{
             this.isStarted = true;
-            this.pollStateIntervalId = setInterval(() => { this.pollState(); }, 1500);
-            deferred.resolve();
-        },
+            this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+            },
             function (xhr) {
                 this._onFatalError($.parseJSON(xhr.responseText));
                 deferred.reject();
