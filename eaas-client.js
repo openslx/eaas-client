@@ -1078,10 +1078,12 @@ export class Client extends EventTarget {
 
     // WebRTC based sound
 
-    initWebRtcAudio (url) {
+    async initWebRtcAudio (url) {
         //const audioStreamElement = document.createElement('audio');
         //audioStreamElement.controls = true;
         //document.documentElement.appendChild(audioStreamElement);
+
+        await fetch(url + '?connect', { method: 'POST' });
 
         const audioctx = new AudioContext();
 
