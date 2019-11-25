@@ -1035,10 +1035,14 @@ EaasClient.Client = function (api_entrypoint, container) {
 
 
     // WebRTC based sound
-    this.initWebRtcAudio = function (url) {
+    this.initWebRtcAudio = async function (url) {
+        // Initialize server-side...
+        await fetch(url + '?connect', { method: 'POST' });
+
+        // Initialize client-side...
+
         const client = _this;
         const audioctx = new AudioContext();
-
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" }
