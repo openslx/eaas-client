@@ -858,11 +858,15 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     };
 
-    this.sendEsc = function() {
-        this.guac.sendKeyEvent(1, 0xff1b);
-        this.guac.sendKeyEvent(0, 0xff1b);
+    this.sendEsc = async function() {
+        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), 
+            {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
+                el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+                await new Promise(r => setTimeout(r, 100));
+                el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+        };
+        pressKey("Esc", 27, {});
     };
-
 
     this.sendCtrlAltDel = async function()
     {
