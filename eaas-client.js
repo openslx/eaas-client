@@ -245,8 +245,10 @@ export class ComponentSession extends EventTarget {
     }
 
     async stop() {
-        _fetch(`${this.API_URL}/components/${this.componentId}/stop`, "GET", null, this.idToken);
+        let res = _fetch(`${this.API_URL}/components/${this.componentId}/stop`, "GET", null, this.idToken);
         this.isStarted = false;
+        console.log("stop: " + res);
+        return res;
     }
 
     async release() {
@@ -613,11 +615,13 @@ export class Client extends EventTarget {
             return;
         }
 
+        let url;
         for (const session of this.sessions) {
-            await session.stop()
+            url = await session.stop()
             await session.release();
         }
         this.sessions = [];
+        return url;
     }
 
     /**
