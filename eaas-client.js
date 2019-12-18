@@ -353,6 +353,8 @@ export class Client extends EventTarget {
             if (emulatorState == "OK")
                 session.keepalive();
             else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
+                if(this.onEmulatorStopped)
+                    this.onEmulatorStopped();
                 session.keepalive();
                 this.dispatchEvent(new CustomEvent("error", { detail: `${emulatorState}` })); // .addEventListener("error", (e) => {})
             }
