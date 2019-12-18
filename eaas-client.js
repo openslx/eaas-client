@@ -113,6 +113,7 @@ export class NetworkSession extends EventTarget {
             hasInternet: options.enableInternet ? true : false,
             enableDhcp: true,
             gateway: options.gateway,
+            network: options.network,
             dhcpNetworkAddress: options.dhcpNetworkAddress,
             dhcpNetworkMask: options.dhcpNetworkMask,
             hasTcpGateway: options.hasTcpGateway ? true : false,
