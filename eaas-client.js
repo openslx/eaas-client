@@ -40,6 +40,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.networkTcpInfo = null;
     this.networkId = null;
     this.driveId = null;
+    this.removableMediaList = null;
     this.params = null;
     this.mode = null;
     this.detached = false;
@@ -453,6 +454,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 .then(function (data, status, xhr) {
                         _this.componentId = data.id;
                         _this.driveId = data.driveId;
+                        _this.removableMediaList = data.removableMediaList;
 
                         var eventUrl = API_URL + "/components/" + data.id + "/events";
                         if(localStorage.getItem('id_token'))
@@ -527,6 +529,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                             }
                             _this.componentId = envData.id;
                             _this.driveId = envData.driveId;
+                            _this.removableMediaList = envData.removableMediaList;
+
                             var eventUrl = API_URL + "/components/" + envData.id + "/events";
                             if (localStorage.getItem('id_token'))
                                 eventUrl += "?access_token=" + localStorage.getItem('id_token');
@@ -1025,6 +1029,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     console.log("Environment " + environmentId + " started.");
                     _this.componentId = data.id;
                     _this.driveId = data.driveId;
+                    _this.removableMediaList = data.removableMediaList;
                     _this.isStarted = true;
                     _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
                     deferred.resolve();
