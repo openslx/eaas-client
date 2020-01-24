@@ -414,6 +414,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                             }
                             _this.componentId = envData.id;
                             _this.driveId = envData.driveId;
+                            _this.removableMediaList = envData.removableMediaList;
                             var eventUrl = API_URL + "/components/" + envData.id + "/events";
                             if(localStorage.getItem('id_token'))
                                 eventUrl += "?access_token="+ localStorage.getItem('id_token');
