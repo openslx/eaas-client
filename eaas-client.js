@@ -40,6 +40,7 @@ EaasClient.Client = function (api_entrypoint, container) {
     this.networkTcpInfo = null;
     this.networkId = null;
     this.driveId = null;
+    this.removableMediaList = null;
     this.params = null;
     this.mode = null;
     this.detached = false;
@@ -453,6 +454,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                 .then(function (data, status, xhr) {
                         _this.componentId = data.id;
                         _this.driveId = data.driveId;
+                        _this.removableMediaList = data.removableMediaList;
 
                         var eventUrl = API_URL + "/components/" + data.id + "/events";
                         if(localStorage.getItem('id_token'))
@@ -527,6 +529,8 @@ EaasClient.Client = function (api_entrypoint, container) {
                             }
                             _this.componentId = envData.id;
                             _this.driveId = envData.driveId;
+                            _this.removableMediaList = envData.removableMediaList;
+
                             var eventUrl = API_URL + "/components/" + envData.id + "/events";
                             if (localStorage.getItem('id_token'))
                                 eventUrl += "?access_token=" + localStorage.getItem('id_token');
@@ -858,11 +862,15 @@ EaasClient.Client = function (api_entrypoint, container) {
 
     };
 
-    this.sendEsc = function() {
-        this.guac.sendKeyEvent(1, 0xff1b);
-        this.guac.sendKeyEvent(0, 0xff1b);
+    this.sendEsc = async function() {
+        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), 
+            {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
+                el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+                await new Promise(r => setTimeout(r, 100));
+                el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+        };
+        pressKey("Esc", 27, {});
     };
-
 
     this.sendCtrlAltDel = async function()
     {
@@ -1021,6 +1029,7 @@ EaasClient.Client = function (api_entrypoint, container) {
                     console.log("Environment " + environmentId + " started.");
                     _this.componentId = data.id;
                     _this.driveId = data.driveId;
+                    _this.removableMediaList = data.removableMediaList;
                     _this.isStarted = true;
                     _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
                     deferred.resolve();
@@ -1035,10 +1044,14 @@ EaasClient.Client = function (api_entrypoint, container) {
 
 
     // WebRTC based sound
-    this.initWebRtcAudio = function (url) {
+    this.initWebRtcAudio = async function (url) {
+        // Initialize server-side...
+        await fetch(url + '?connect', { method: 'POST' });
+
+        // Initialize client-side...
+
         const client = _this;
         const audioctx = new AudioContext();
-
         const rtcConfig = {
             iceServers: [
                 { urls: "stun:stun.l.google.com:19302" }
