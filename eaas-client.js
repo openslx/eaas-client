@@ -428,7 +428,7 @@ export class Client extends EventTarget {
             console.log("container " + containerId + " started.");
             this.componentId = data.id;
             this.isStarted = true;
-            this.pollStateIntervalId = setInterval(() => { this.pollState(); }, 1500);
+            this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
             deferred.resolve();
         },
             function (xhr) {
