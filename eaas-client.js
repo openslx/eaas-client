@@ -431,7 +431,7 @@ export class Client extends EventTarget {
             this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
             deferred.resolve();
         },
-            function (xhr) {
+            (xhr) => {
                 this._onFatalError($.parseJSON(xhr.responseText));
                 deferred.reject();
             });
@@ -600,7 +600,7 @@ export class Client extends EventTarget {
             this.isStarted = true;
             this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
             },
-            function (xhr) {
+            (xhr) => {
                 this._onFatalError($.parseJSON(xhr.responseText));
                 deferred.reject();
             });
@@ -1066,15 +1066,15 @@ export class Client extends EventTarget {
             contentType: "application/json",
             headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
         })
-            .then(function (data, status, xhr) {
+            .then((data, status, xhr) => {
                 console.log("Environment " + environmentId + " started.");
                 this.componentId = data.id;
                 this.driveId = data.driveId;
                 this.isStarted = true;
-                this.pollStateIntervalId = setInterval(() => { this.pollState(); }, 1500);
+                this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
                 deferred.resolve();
             },
-                function (xhr) {
+                (xhr) => {
                     this._onFatalError($.parseJSON(xhr.responseText));
                     deferred.reject();
                 });
