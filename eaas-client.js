@@ -161,6 +161,7 @@ export class ComponentSession extends EventTarget {
         this.environmentId = environmentId;
         this.componentId = componentId;
         this.driveId = -1;
+        this.removableMediaList = null;
 
         this.eventSource = null;
 
@@ -195,6 +196,7 @@ export class ComponentSession extends EventTarget {
             this.componentId = result.id;
             
             this.driveId = result.driveId;
+            this.removableMediaList = result.removableMediaList;
             let component = new ComponentSession(api, environmentRequest.environment, result.id, idToken);
             console.log("Environment " + environmentRequest.environment + " started.");
 
@@ -573,6 +575,7 @@ export class Client extends EventTarget {
                         }
                         this.componentId = envData.id;
                         this.driveId = envData.driveId;
+                        this.removableMediaList = envData.removableMediaList;
                         var eventUrl = this.API_URL + "/components/" + envData.id + "/events";
                         if (localStorage.getItem('id_token'))
                             eventUrl += "?access_token=" + localStorage.getItem('id_token');
@@ -848,33 +851,38 @@ export class Client extends EventTarget {
         $(this.container).empty();
     };
 
-    sendEsc() {
-        this.guac.sendKeyEvent(1, 0xff1b);
-        this.guac.sendKeyEvent(0, 0xff1b);
+    this.sendEsc = async function() {
+        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), 
+            {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
+                el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+                await new Promise(r => setTimeout(r, 100));
+                el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+        };
+        pressKey("Esc", 27, {});
     };
 
-
-    async sendCtrlAltDel() {
-        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), { altKey, ctrlKey, metaKey, timeout } = { timeout: 100 }, el = document.getElementById("emulator-container").firstElementChild) => {
-            if (ctrlKey) {
-                el.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", keyCode: 17, bubbles: true }));
-                await new Promise(r => setTimeout(r, 100));
-            }
-            if (altKey) {
-                el.dispatchEvent(new KeyboardEvent("keydown", { key: "Alt", keyCode: 18, bubbles: true }));
-                await new Promise(r => setTimeout(r, 100));
-            }
-            el.dispatchEvent(new KeyboardEvent("keydown", { key, keyCode, ctrlKey, altKey, metaKey, bubbles: true }));
-            await new Promise(r => setTimeout(r, 100));
-            el.dispatchEvent(new KeyboardEvent("keyup", { key, keyCode, ctrlKey, altKey, metaKey, bubbles: true }));
-            if (altKey) {
-                await new Promise(r => setTimeout(r, 100));
-                el.dispatchEvent(new KeyboardEvent("keyup", { key: "Alt", keyCode: 18, bubbles: true }));
-            }
-            if (ctrlKey) {
-                await new Promise(r => setTimeout(r, 100));
-                el.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", keyCode: 17, bubbles: true }));
-            }
+    this.sendCtrlAltDel = async function()
+    {
+        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
+         if (ctrlKey) {
+             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Control", keyCode: 17, bubbles: true}));
+             await new Promise(r => setTimeout(r, 100));
+         }
+         if (altKey) {
+             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Alt", keyCode: 18, bubbles: true}));
+             await new Promise(r => setTimeout(r, 100));
+         }
+         el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+         await new Promise(r => setTimeout(r, 100));
+         el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+         if (altKey) {
+             await new Promise(r => setTimeout(r, 100));
+             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Alt", keyCode: 18, bubbles: true}));
+         }
+         if (ctrlKey) {
+             await new Promise(r => setTimeout(r, 100));
+             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Control", keyCode: 17, bubbles: true}));
+         }
         };
         pressKey("Delete", 46, { altKey: true, ctrlKey: true, metaKey: true })
     };
@@ -1070,6 +1078,7 @@ export class Client extends EventTarget {
                 console.log("Environment " + environmentId + " started.");
                 this.componentId = data.id;
                 this.driveId = data.driveId;
+                this.removableMediaList = data.removableMediaList;
                 this.isStarted = true;
                 this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
                 deferred.resolve();
@@ -1093,7 +1102,6 @@ export class Client extends EventTarget {
         await fetch(url + '?connect', { method: 'POST' });
 
         const audioctx = new AudioContext();
-
         const rtcConfig = {
             iceServers: [
 
