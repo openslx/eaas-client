@@ -849,9 +849,9 @@ export class Client extends EventTarget {
         }
 
         $(this.container).empty();
-    };
+    }
 
-    this.sendEsc = async function() {
+    async sendEsc()  {
         const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), 
             {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
                 el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
@@ -859,9 +859,9 @@ export class Client extends EventTarget {
                 el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
         };
         pressKey("Esc", 27, {});
-    };
+    }
 
-    this.sendCtrlAltDel = async function()
+    sendCtrlAltDel() 
     {
         const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
          if (ctrlKey) {
@@ -885,7 +885,7 @@ export class Client extends EventTarget {
          }
         };
         pressKey("Delete", 46, { altKey: true, ctrlKey: true, metaKey: true })
-    };
+    }
 
     snapshot(postObj, onChangeDone, errorFn) {
         $.ajax({
