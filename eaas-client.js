@@ -1,10 +1,5 @@
-
-function formatStr(format) {
-    var args = Array.prototype.slice.call(arguments, 1);
-    return format.replace(/{(\d+)}/g, function (match, number) {
-        return typeof args[number] != 'undefined' ? args[number] : match;
-    });
-}
+import {NetworkSession} from "./networkSession.js"
+import {ComponentSession} from "./componentSession.js"
 
 function strParamsToObject(str) {
     var result = {};
@@ -17,266 +12,11 @@ function strParamsToObject(str) {
     return result;
 }
 
-async function _fetch(url, method = "GET", obj, token = null) {
-    let header = {};
-    let body = undefined;
-    if (token) header.authorization = `Bearer ${token}`;
-    if (obj) {
-        header['content-type'] = "application/json";
-        body = JSON.stringify(obj);
-    }
-
-    const res = await fetch(url, {
-        method,
-        headers: header,
-        body: body,
+function formatStr(format) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return format.replace(/{(\d+)}/g, function (match, number) {
+        return typeof args[number] != 'undefined' ? args[number] : match;
     });
-    if (res.ok) {
-        try {
-            return await res.json();
-        } catch (e) {
-            return;
-        }
-    }
-
-    throw new Error(`${res.status} @ ${url} : ${await res.text()}`);
-}
-
-export class NetworkSession extends EventTarget {
-    constructor(api, idToken = null) {
-        super();
-        this.sessionId = undefined;
-        this.API_URL = api;
-        this.idToken = idToken;
-        this.sessionComponents = [];
-        this.isDetached = false;
-    }
-
-    async keepalive() {
-        if (!this.sessionId || this.isDetached)
-            return;
-        _fetch(`${this.API_URL}/sessions/${this.sessionId}/keepalive`, "POST", null, this.idToken);
-    }
-
-    async relase() {
-        if (!this.sessionId || this.isDetached)
-            return;
-
-        _fetch(`${this.API_URL}/sessions/${this.sessionId}`, "DELETE", null, this.idToken);
-        this.sessionId = undefined;
-    }
-
-    async wsConnection() {
-
-        if (this.sessionId == null) {
-            return null;
-        }
-        const url = `${this.API_URL}/networks/${this.sessionId}/wsConnection`;
-        const res = await _fetch(url, "GET", null, this.idToken);
-
-        if (!res.ok)
-            throw new Error(await res.text());
-
-        const url2 = new URL(res.wsConnection, this.API_URL);
-        if (url2.port === "443")
-            url2.protocol = "wss";
-        return String(url2);
-    }
-
-    load(sessionId, sessions, options)
-    {
-        this.isDetached = true;
-        this.sessionId = sessionId;
-        for (const session of sessions) {
-            this.sessionComponents.push(session);
-            session.setNetworkId(session);
-        }
-    }
-
-    async startNetwork(sessions, options) {
-        const components = [];
-
-        for (const session of sessions) {
-            components.push({
-                componentId: session.componentId,
-                serverPorts: session.serverPorts,
-                serverIp: session.serverIp,
-                networkLabel: session.networkLabel ? session.networkLabel : undefined,
-                hwAddress: session.hwAddress ? session.hwAddress : "auto",
-            });
-            this.sessionComponents.push(session);
-        }
-
-        let obj = {
-            networkEnvironmentId: options.envId ? options.envId : undefined,
-            components: components,
-            hasInternet: options.enableInternet ? true : false,
-            enableDhcp: true,
-            gateway: options.gateway,
-            network: options.network,
-            dhcpNetworkAddress: options.dhcpNetworkAddress,
-            dhcpNetworkMask: options.dhcpNetworkMask,
-            hasTcpGateway: options.hasTcpGateway ? true : false,
-            tcpGatewayConfig: options.tcpGatewayConfig ? options.tcpGatewayConfig : {}
-        };
-        let result = await _fetch(`${this.API_URL}/networks`, "POST", obj, this.idToken);
-        this.sessionId = result.id;
-        this.networkTcpInfo = result.networkUrls != null ? result.networkUrls.tcp : null;
-
-        for (const session of this.sessionComponents) {
-            session.setNetworkId(this.sessionId);
-        }
-    }
-
-    getSession(id)
-    {
-        for(let session of this.sessionComponents)
-        {
-            if(session.componentId === id)
-                return session;
-        }
-        throw new Error("session not found");
-    }
-
-    async detach(name, detachTime_minutes) {
-        if (this.isDetached)
-            return;
-
-        let res = await _fetch(`${this.API_URL}/sessions/${this.sessionId}/detach`, "POST", {
-            lifetime: detachTime_minutes,
-            lifetime_unit: "minutes",
-            sessionName: name,
-        }, this.idToken);
-        this.isDetached = true;
-    }
-}
-
-export class ComponentSession extends EventTarget {
-
-    constructor(api, environmentId, componentId, idToken = null) {
-        super();
-
-        this.API_URL = api;
-        this.idToken = idToken;
-        this.environmentId = environmentId;
-        this.componentId = componentId;
-        this.driveId = -1;
-        this.removableMediaList = null;
-
-        this.eventSource = null;
-
-        this.hasNetworkSession = false;
-        this.released = false;
-        this.emulatorState = undefined;
-
-        this.networkId = undefined;
-
-        let eventUrl = this.API_URL + "/components/" + this.componentId + "/events";
-        if (this.idToken)
-            eventUrl += "?access_token=" + this.idToken;
-
-        this.eventSource = new EventSource(eventUrl);
-        
-        this.isStarted = true;
-    }
-
-    setdriveId(id)
-    {
-        this.driveId = id;
-    }
-
-    setNetworkId(nwId) {
-        this.networkId = nwId;
-    }
-
-    static async startComponent(api, environmentRequest, idToken) {
-        try {
-            let result = await _fetch(`${api}/components`, "POST", environmentRequest, idToken);
-
-            this.componentId = result.id;
-            
-            this.driveId = result.driveId;
-            this.removableMediaList = result.removableMediaList;
-            let component = new ComponentSession(api, environmentRequest.environment, result.id, idToken);
-            console.log("Environment " + environmentRequest.environment + " started.");
-
-           return component;
-        }
-        catch (e) {
-            throw new Error("failed to start environmemt: " + e);
-        }
-    }
-
-    async getControlUrl() {
-        if (!this.isStarted) {
-            throw new Error("Environment was not started properly!");
-        }
-        if (this.isAbort)
-            throw new Error("Environment has be stopped");
-
-        return _fetch(`${this.API_URL}/components/${this.componentId}/controlurls`, "GET", undefined, this.idToken);
-    }
-
-    getNetworkId()
-    {
-        return this.networkId;
-    }
-
-    async keepalive() {
-        if (this.networkId && !this.forceKeepalive) // if part of an network, network session will take care
-            return;
-
-        const url = `${this.API_URL}/components/${this.componentId}/keepalive`;
-        _fetch(url, "POST", null, this.idToken);
-    };
-
-    async getEmulatorState() {
-        if (this.isStarted)
-            return _fetch(`${this.API_URL}/components/${this.componentId}/state`, "GET", null, this.idToken);
-        else return null;
-    }
-
-    disconnect()
-    {
-        if (this.eventSource) {
-            this.eventSource.close();
-            this.eventSource = undefined;
-        }
-
-        if (this.peer_connection != null)
-            this.peer_connection.close();
-    }
-
-    async stop() {
-        let res = _fetch(`${this.API_URL}/components/${this.componentId}/stop`, "GET", null, this.idToken);
-        this.isStarted = false;
-        console.log("stop: " + res);
-        return res;
-    }
-
-    async release() {
-        if (!this.componentId)
-            return;
-
-        if (this.networkId) // network session takes care
-            return;
-
-        if (this.eventSource) {
-            this.eventSource.close();
-            this.eventSource = undefined;
-        }
-
-        _fetch(`${this.API_URL}/components/${this.componentId}`, "DELETE", null, this.idToken);
-        this.componentId = undefined;
-    }
-
-    getContainerResultUrl() {
-        // console.log(this.componentId);
-        if (this.componentId == null) {
-            this.onError("Component ID is null, please contact administrator");
-        }
-        return this.API_URL + formatStr("/components/{0}/result", this.componentId);
-    }
 }
 
 export class Client extends EventTarget {
@@ -380,7 +120,11 @@ export class Client extends EventTarget {
         if (this.onResize) {
             this.onResize(width, height);
         }
-    };
+    }
+
+    getActiveSession() {
+        return this.activeView;
+    }
 
     // Disconnects viewer from a running session
     disconnect() {
