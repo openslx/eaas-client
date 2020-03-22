@@ -9,7 +9,6 @@ export class ComponentSession extends EventTarget {
         this.idToken = idToken;
         this.environmentId = environmentId;
         this.componentId = componentId;
-        this.driveId = -1;
         this.removableMediaList = null;
 
         this.eventSource = null;
@@ -33,15 +32,15 @@ export class ComponentSession extends EventTarget {
         this.networkId = nwId;
     }
 
+    getRemovableMediaList() {
+        return this.removableMediaList;
+    }
+
     static async startComponent(api, environmentRequest, idToken) {
         try {
             let result = await _fetch(`${api}/components`, "POST", environmentRequest, idToken);
-
-            this.componentId = result.id;
-            
-            this.driveId = result.driveId;
-            this.removableMediaList = result.removableMediaList;
             let component = new ComponentSession(api, environmentRequest.environment, result.id, idToken);
+            component.removableMediaList = result.removableMediaList;
             console.log("Environment " + environmentRequest.environment + " started.");
 
            return component;
