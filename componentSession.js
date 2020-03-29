@@ -135,6 +135,8 @@ export class ComponentSession extends EventTarget {
             throw new Error("Environment was not started properly!");
         }
 
+        this.disconnect();
+
         if (this.networkId != null) {
             // Remove the main component from the network group first!
             await this._removeNetworkComponent(this.networkId, this.componentId);
