@@ -145,7 +145,7 @@ export class ComponentSession extends EventTarget {
         console.log("Checkpointing session...");
         let result = await _fetch(`${this.API_URL}/components/${this.componentId}/checkpoint`, "POST", request, this.idToken);
         console.log(result);
-        console.log("Checkpoint created: " + result.envid);
+        console.log("Checkpoint created: " + result.envId);
         return result.envid;
     }
 }
