@@ -113,11 +113,37 @@ export class ComponentSession extends EventTarget {
         this.componentId = undefined;
     }
 
-    getContainerResultUrl() {
+    async getContainerResultUrl() {
         // console.log(this.componentId);
         if (this.componentId == null) {
-            this.onError("Component ID is null, please contact administrator");
+            throw new Error("Component ID is null, please contact administrator");
         }
-        return this.API_URL + formatStr("/components/{0}/result", this.componentId);
+
+        return _fetch(`${this.API_URL}/components/${this.componentId}/result`, "GET", null, this.idToken)
+    }
+
+
+    async _removeNetworkComponent(netid, compid) {
+        console.log("Removing component " + compid + " from network " + netid);
+        await _fetch(`${this.API_URL}/networks/${netid}/components/${compid}`, "DELETE", null, this.idToken);
+        console.log("Component removed: " + compid);
+    }
+
+    // Checkpoints a running session
+    async checkpoint(request) {
+        if (!this.isStarted) {
+            throw new Error("Environment was not started properly!");
+        }
+
+        if (this.networkId != null) {
+            // Remove the main component from the network group first!
+            await this._removeNetworkComponent(this.networkId, this.componentId);
+        }
+
+        console.log("Checkpointing session...");
+        let result = await _fetch(`${this.API_URL}/components/${this.componentId}/checkpoint`, "POST", request, this.idToken);
+        console.log(result);
+        console.log("Checkpoint created: " + result.envid);
+        return result.envid;
     }
 }

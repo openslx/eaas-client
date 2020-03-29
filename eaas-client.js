@@ -502,69 +502,6 @@ export class Client extends EventTarget {
         return String(eaasURL);
     }
 
-    async _removeNetworkComponent(netid, compid) {
-        console.log("Removing component " + compid + " from network " + netid);
-        try {
-            await $.ajax({
-                type: "DELETE",
-                url: this.API_URL + formatStr("/networks/{0}/components/{1}", netid, compid),
-                timeout: 10000,
-                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
-            });
-        }
-        catch (xhr) {
-            const json = $.parseJSON(xhr.responseText);
-            if (json.error !== null)
-                console.error("Server-Error:" + json.error);
-            if (json.detail !== null)
-                console.error("Server-Error Details:" + json.detail);
-            if (json.stacktrace !== null)
-                console.error("Server-Error Stacktrace:" + json.stacktrace);
-
-            console.error("Removing component failed!");
-            throw undefined;
-        }
-
-        console.log("Component removed: " + compid);
-    }
-
-    // Checkpoints a running session
-    async checkpoint(request) {
-        if (!this.isStarted) {
-            this._onFatalError("Environment was not started properly!");
-            throw undefined;
-        }
-
-        if (this.networkId != null) {
-            // Remove the main component from the network group first!
-            await this._removeNetworkComponent(this.networkId, this.componentId);
-        }
-
-        console.log("Checkpointing session...");
-        try {
-            const data = await $.ajax({
-                type: "POST",
-                url: this.API_URL + formatStr("/components/{0}/checkpoint", this.componentId),
-                timeout: 60000,
-                contentType: "application/json",
-                data: JSON.stringify(request),
-                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
-            });
-
-            const envid = data.envId;
-            console.log("Checkpoint created: " + envid);
-            return envid;
-        }
-        catch (xhr) {
-            var json = $.parseJSON(xhr.responseText);
-            if (json.message !== null)
-                console.error("Server-Error:" + json.message);
-
-            console.error("Checkpointing failed!");
-            throw undefined;
-        }
-    }
-
     downloadPrint(label) {
         return `${this.API_URL}/components/${this.componentId}/downloadPrintJob?label=${encodeURI(label)}`;
     }
