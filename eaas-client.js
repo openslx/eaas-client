@@ -83,7 +83,7 @@ export class Client extends EventTarget {
 
         for (const session of this.sessions) {
 
-            if(session.getNetworkId() && !session.forceKeepalive)
+            if(session.getNetwork() && !session.forceKeepalive)
                 continue;
 
             let result = await session.getEmulatorState();

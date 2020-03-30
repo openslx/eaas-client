@@ -17,7 +17,7 @@ export class ComponentSession extends EventTarget {
         this.released = false;
         this.emulatorState = undefined;
 
-        this.networkId = undefined;
+        this.network = undefined;
 
         let eventUrl = this.API_URL + "/components/" + this.componentId + "/events";
         if (this.idToken)
@@ -28,8 +28,13 @@ export class ComponentSession extends EventTarget {
         this.isStarted = true;
     }
 
-    setNetworkId(nwId) {
-        this.networkId = nwId;
+    setNetwort(network) {
+        this.network = network;
+    }
+
+    getNetwork()
+    {
+        return this.network;
     }
 
     getRemovableMediaList() {
@@ -60,18 +65,13 @@ export class ComponentSession extends EventTarget {
         return _fetch(`${this.API_URL}/components/${this.componentId}/controlurls`, "GET", undefined, this.idToken);
     }
 
-    getNetworkId()
-    {
-        return this.networkId;
-    }
-
     async keepalive() {
-        if (this.networkId && !this.forceKeepalive) // if part of an network, network session will take care
+        if (this.network && !this.forceKeepalive) // if part of an network, network session will take care
             return;
 
         const url = `${this.API_URL}/components/${this.componentId}/keepalive`;
         _fetch(url, "POST", null, this.idToken);
-    };
+    }
 
     async getEmulatorState() {
         if (this.isStarted)
@@ -101,7 +101,7 @@ export class ComponentSession extends EventTarget {
         if (!this.componentId)
             return;
 
-        if (this.networkId) // network session takes care
+        if (this.network) // network session takes care
             return;
 
         if (this.eventSource) {
@@ -118,15 +118,8 @@ export class ComponentSession extends EventTarget {
         if (this.componentId == null) {
             throw new Error("Component ID is null, please contact administrator");
         }
-        
+
         return _fetch(`${this.API_URL}/components/${this.componentId}/result`, "GET", null, this.idToken)
-    }
-
-
-    async _removeNetworkComponent(netid, compid) {
-        console.log("Removing component " + compid + " from network " + netid);
-        await _fetch(`${this.API_URL}/networks/${netid}/components/${compid}`, "DELETE", null, this.idToken);
-        console.log("Component removed: " + compid);
     }
 
     // Checkpoints a running session
@@ -135,9 +128,9 @@ export class ComponentSession extends EventTarget {
             throw new Error("Environment was not started properly!");
         }
 
-        if (this.networkId != null) {
+        if (this.network) {
             // Remove the main component from the network group first!
-            await this._removeNetworkComponent(this.networkId, this.componentId);
+            await this.network.remove(this.componentId);
         }
 
         console.log("Checkpointing session...");

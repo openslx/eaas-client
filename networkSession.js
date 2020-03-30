@@ -82,8 +82,20 @@ export class NetworkSession extends EventTarget {
         this.networkTcpInfo = result.networkUrls != null ? result.networkUrls.tcp : null;
 
         for (const session of this.sessionComponents) {
-            session.setNetworkId(this.sessionId);
+            session.setNetwork(this);
         }
+    }
+
+    getId()
+    {
+        return this.sessionId;
+    }
+
+
+    async remove(compid) {
+        console.log("Removing component " + compid + " from network " + this.sessionId);
+        await _fetch(`${this.API_URL}/networks/${this.sessionId}/components/${compid}`, "DELETE", null, this.idToken);
+        console.log("Component removed: " + compid);
     }
 
     getSession(id)
