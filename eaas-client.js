@@ -126,6 +126,12 @@ export class Client extends EventTarget {
         return this.activeView;
     }
 
+    async checkpoint(request) {
+        let session = this.activeView;
+        this.disconnect();
+        return session.checkpoint(request);
+    }
+
     // Disconnects viewer from a running session
     disconnect() {
         if (!this.activeView) {

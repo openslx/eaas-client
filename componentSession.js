@@ -118,7 +118,7 @@ export class ComponentSession extends EventTarget {
         if (this.componentId == null) {
             throw new Error("Component ID is null, please contact administrator");
         }
-
+        
         return _fetch(`${this.API_URL}/components/${this.componentId}/result`, "GET", null, this.idToken)
     }
 
@@ -134,8 +134,6 @@ export class ComponentSession extends EventTarget {
         if (!this.isStarted) {
             throw new Error("Environment was not started properly!");
         }
-
-        this.disconnect();
 
         if (this.networkId != null) {
             // Remove the main component from the network group first!
