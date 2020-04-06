@@ -1,4 +1,4 @@
-import {_fetch} from "./util.js"
+import {_fetch, ClientError} from "./util.js"
 
 export class ComponentSession extends EventTarget {
 
@@ -24,7 +24,7 @@ export class ComponentSession extends EventTarget {
             eventUrl += "?access_token=" + this.idToken;
 
         this.eventSource = new EventSource(eventUrl);
-        
+
         this.isStarted = true;
     }
 
@@ -50,8 +50,8 @@ export class ComponentSession extends EventTarget {
 
            return component;
         }
-        catch (e) {
-            throw new Error("failed to start environmemt: " + e);
+        catch (error) {
+            throw new ClientError("Starting server-side component failed!", error);
         }
     }
 

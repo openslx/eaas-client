@@ -1,5 +1,9 @@
 import {NetworkSession} from "./networkSession.js"
 import {ComponentSession} from "./componentSession.js"
+import {ClientError} from "./util.js"
+
+export {ClientError};
+
 
 function strParamsToObject(str) {
     var result = {};
@@ -270,7 +274,7 @@ export class Client extends EventTarget {
         }
         catch (e) {
             this.release();
-            throw new Error("starting environment session failed: " + e);
+            throw new ClientError("Starting environment session failed!", e);
         }
         return componentSession;
     }
