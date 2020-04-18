@@ -28,7 +28,7 @@ export class ComponentSession extends EventTarget {
         this.isStarted = true;
     }
 
-    setNetwort(network) {
+    setNetwork(network) {
         this.network = network;
     }
 
