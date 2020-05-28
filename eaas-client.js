@@ -214,7 +214,8 @@ export class Client extends EventTarget {
     }
 
     async attachNewEnv(environmentRequest, session) {
-        const componentSession = await ComponentSession.startComponent(this.API_URL, environmentRequest, this.idToken);
+
+        let componentSession = this.createComponent(environmentRequest);
         this._attachToSwitch({id: componentSession.componentId}, session.sessionId);
         componentSession.type = "machine";
         session.components.push(componentSession);
@@ -354,8 +355,10 @@ export class Client extends EventTarget {
         if (this.activeView)
             this.disconnect();
 
-        if (view)
-            this.activeView = view;
+        if (!view)
+            throw new Error("no active view possible");           
+        
+        this.activeView = view;
 
         this.container = container;
         console.log(`Connecting viewer... @ ${this.container}`);
