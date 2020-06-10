@@ -162,6 +162,36 @@ export class Client extends EventTarget {
         console.log("Viewer disconnected successfully.")
     }
 
+    async attachNewEnv(session, container, environmentRequest) {
+
+        this.load(session);
+        
+        let componentSession = await this.createComponent(environmentRequest);
+        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+
+        this._connectToNetwork(componentSession, session.sessionId);
+        componentSession.forceKeepalive = true;
+
+        this.network.sessionComponents.push(componentSession);
+        this.network.networkConfig.components.push({componentId: componentSession.componentId, networkLabel: "Temp Client"});
+        this.sessions.push(componentSession);
+
+        await this.connect(container, componentSession);
+    }
+
+    async attach(session, container, _componentId)
+    {
+        this.load(session);
+
+        let componentSession;
+        if(_componentId) {
+            componentSession = this.getSession(_componentId);
+        }
+
+        console.log("attching component:" + componentSession);
+        await this.connect(container, componentSession);
+    }
+
     async start(components, options, attachId) {
         if(options) {
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
@@ -212,23 +242,13 @@ export class Client extends EventTarget {
             throw new ClientError("Starting server-side component failed!", error);
         }
     }
-
-    async attachNewEnv(environmentRequest, session) {
-
-        let componentSession = this.createComponent(environmentRequest);
-        this._attachToSwitch({id: componentSession.componentId}, session.sessionId);
-        componentSession.type = "machine";
-        session.components.push(componentSession);
-        session.network.components.push({componentId: componentSession.componentId, networkLabel: "Temp Client"});
-        session.componentIdToInitialize = componentSession.componentId;
-        componentSession.forceKeepalive = true;
-        this.sessions.push(componentSession);
-        console.log(this.sessions);
-        return session;
-    }
-
-    load(sessionId, sessionComponents, networkInfo)
+    
+    load(session)
     {
+        const sessionId = session.sessionId;
+        const sessionComponents = session.components;
+        const networkInfo = session.network;
+
         for(const sc of sessionComponents)
         {
             if(sc.type !== "machine")
@@ -245,7 +265,9 @@ export class Client extends EventTarget {
         this.network.load(sessionId, this.sessions, networkInfo);
     }
 
+/*
     _connectEnvs2(environments, attachId) {
+        console.log("FIX ME!");
         var idsData = [];
         for (let i = 0; i < environments.length; i++) {
             $.ajax({
@@ -276,25 +298,16 @@ export class Client extends EventTarget {
         }
         this._attachToSwitch(idsData[0], attachId);
     }
+    */
 
-    _attachToSwitch(clientData, networkID) {
-        $.ajax({
-            type: "POST",
-            url: this.API_URL + "/networks/" + networkID + "/addComponentToSwitch",
-            data: JSON.stringify({
-                componentId: clientData.id,
-            }),
-            contentType: "application/json",
-            headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
-        }).then( (status, xhr) =>{
-            this.isStarted = true;
-            this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+    async _connectToNetwork(component, networkID) {
+        const result = await _fetch(`${this.API_URL}/networks/${networkID}/addComponentToSwitch`, "POST", 
+            {
+                componentId: component.getId(),
             },
-            (xhr) => {
-                this._onFatalError($.parseJSON(xhr.responseText));
-                deferred.reject();
-            });
-    };
+            this.idToken);
+        return result;
+    }
 
     async release() {
 
