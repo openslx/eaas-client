@@ -549,7 +549,7 @@ export class Client extends EventTarget {
                 return;
             }
 
-            console.log("Sending ICE candidate to server...");
+            console.log("Sending ICE candidate to server...", event.candidate);
 
             const body = {
                 type: 'ice',
