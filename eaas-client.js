@@ -536,7 +536,7 @@ export class Client extends EventTarget {
         const rtcConfig = {
             iceServers: [
 
-                { urls: "turn:demo.emulation.cloud" }
+                { urls: "stun:stun.l.google.com:19302" }
             ]
         };
 
