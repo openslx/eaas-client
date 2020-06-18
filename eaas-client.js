@@ -532,11 +532,15 @@ export class Client extends EventTarget {
 
         await fetch(url + '?connect', { method: 'POST' });
 
+        let _url = new URL(url);
+        console.log("using host: " + _url.hostname + " for audio connection");
         const audioctx = new AudioContext();
         const rtcConfig = {
             iceServers: [
-
-                { urls: "stun:stun.l.google.com:19302" }
+                {   urls: "turn:" + _url.hostname,
+                    username: "eaas",
+                    credential: "eaas"
+                }
             ]
         };
 
