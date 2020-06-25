@@ -534,6 +534,7 @@ export class Client {
 
         let _url = new URL(url);
         console.log("using host: " + _url.hostname + " for audio connection");
+        const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
         const rtcConfig = {
             iceServers: [
