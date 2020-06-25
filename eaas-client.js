@@ -17,9 +17,9 @@ function strParamsToObject(str) {
     return result;
 }
 
-export class Client extends EventTarget {
+export class Client {
+    // eslint-disable-next-line constructor-super
     constructor(api_entrypoint, idToken = null) {
-        super();
         this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
         this.container;
         this.idToken = idToken;
