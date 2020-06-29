@@ -234,6 +234,7 @@ export class Client {
             let result = await _fetch(`${this.API_URL}/components`, "POST", componentRequest.build(), this.idToken);
             let component = new ComponentSession(this.API_URL, componentRequest.environment, result.id, this.idToken);
             component.setRemovableMediaList(result.removableMediaList);
+            component.setSessionRequestInfo(componentRequest);
             console.log("Environment " + componentRequest.environment + " started.");
 
            return component;
