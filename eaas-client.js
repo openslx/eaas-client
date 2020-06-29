@@ -232,7 +232,7 @@ export class Client {
     async createComponent(componentRequest) {
         try {
             let result = await _fetch(`${this.API_URL}/components`, "POST", componentRequest.build(), this.idToken);
-            let component = new ComponentSession(this.API_URL, componentRequest, result.id, this.idToken);
+            let component = new ComponentSession(this.API_URL, componentRequest.environment, result.id, this.idToken);
             component.setRemovableMediaList(result.removableMediaList);
             console.log("Environment " + componentRequest.environment + " started.");
 
