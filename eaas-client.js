@@ -537,14 +537,18 @@ export class Client {
         console.log("using host: " + _url.hostname + " for audio connection");
         const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
-        const rtcConfig = {
-            iceServers: [
-                {   urls: "turn:" + _url.hostname,
-                    username: "eaas",
-                    credential: "eaas"
-                }
-            ]
-        };
+
+        let rtcConfig = undefined;
+        if(_url.hostname !== "localhost") {
+            rtcConfig = {
+                iceServers: [
+                    {   urls: "turn:" + _url.hostname,
+                        username: "eaas",
+                        credential: "eaas"
+                    }
+                ]
+            };
+        }
 
         console.log("Creating RTC peer connection...");
         this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
