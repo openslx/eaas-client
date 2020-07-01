@@ -532,23 +532,15 @@ export class Client {
         //document.documentElement.appendChild(audioStreamElement);
 
         await fetch(url + '?connect', { method: 'POST' });
-
-        let _url = new URL(url);
-        console.log("using host: " + _url.hostname + " for audio connection");
+        
         const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
+        const rtcConfig = {
+            iceServers: [
 
-        let rtcConfig = undefined;
-        if(_url.hostname !== "localhost") {
-            rtcConfig = {
-                iceServers: [
-                    {   urls: "turn:" + _url.hostname,
-                        username: "eaas",
-                        credential: "eaas"
-                    }
-                ]
-            };
-        }
+                { urls: "stun:stun.l.google.com:19302" }
+            ]
+        };
 
         console.log("Creating RTC peer connection...");
         this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
