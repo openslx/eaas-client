@@ -2,7 +2,7 @@ import {NetworkSession} from "./lib/networkSession.js"
 import {ComponentSession} from "./lib/componentSession.js"
 import {ClientError, sendEsc, sendCtrlAltDel, _fetch, requestPointerLock} from "./lib/util.js"
 import {prepareAndLoadXpra} from "./lib/xpraWrapper.js"
-import EventTarget from "./third_party/event-target/esm/index"
+import EventTarget from "./third_party/event-target/esm/index.js"
 
 export {sendEsc, sendCtrlAltDel, requestPointerLock};
 export {ClientError};
