@@ -163,14 +163,15 @@ export class Client extends EventTarget {
         console.log("Viewer disconnected successfully.")
     }
 
-    async attachNewEnv(session, container, environmentRequest) {
-
+    async attachNewEnv(sessionId, container, environmentRequest) 
+    {
+        let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
         this.load(session);
         
         let componentSession = await this.createComponent(environmentRequest);
         this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
 
-        this._connectToNetwork(componentSession, session.sessionId);
+        this._connectToNetwork(componentSession, sessionId);
         componentSession.forceKeepalive = true;
 
         this.network.sessionComponents.push(componentSession);
@@ -180,8 +181,9 @@ export class Client extends EventTarget {
         await this.connect(container, componentSession);
     }
 
-    async attach(session, container, _componentId)
+    async attach(sessionId, container, _componentId)
     {
+        let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
         this.load(session);
 
         let componentSession;
@@ -193,17 +195,9 @@ export class Client extends EventTarget {
         await this.connect(container, componentSession);
     }
 
-    async start(components, options, attachId) {
+    async start(components, options) {
         if(options) {
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
-        }
-
-        if (attachId) {
-            if (components.length > 1) {
-                this._onFatalError("We don't support hot connection for multiple environments ... yet. ");
-            }
-            // console.log(" I came to attachId section!" , environments[0]);
-            return this._connectEnvs2(components, attachId);
         }
 
         try {
@@ -266,41 +260,6 @@ export class Client extends EventTarget {
         this.network = new NetworkSession(this.API_URL, this.idToken);
         this.network.load(sessionId, this.sessions, networkInfo);
     }
-
-/*
-    _connectEnvs2(environments, attachId) {
-        console.log("FIX ME!");
-        var idsData = [];
-        for (let i = 0; i < environments.length; i++) {
-            $.ajax({
-                type: "POST",
-                url: this.API_URL + "/components",
-                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {},
-                success: function (envData, status2, xhr2) {
-                    idsData.push(envData);
-                    if (environments[i].visualize == true) {
-                        // console.log("this.componentId " + this.componentId);
-                        if (this.componentId != null) {
-                            console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
-                            return;
-                        }
-                        this.componentId = envData.id;
-                        this.driveId = envData.driveId;
-                        this.removableMediaList = envData.removableMediaList;
-                        var eventUrl = this.API_URL + "/components/" + envData.id + "/events";
-                        if (localStorage.getItem('id_token'))
-                            eventUrl += "?access_token=" + localStorage.getItem('id_token');
-                        this.eventSource = new EventSource(eventUrl);
-                    }
-                },
-                async: false,
-                data: JSON.stringify(environments[i].data),
-                contentType: "application/json"
-            })
-        }
-        this._attachToSwitch(idsData[0], attachId);
-    }
-    */
 
     async _connectToNetwork(component, networkID) {
         const result = await _fetch(`${this.API_URL}/networks/${networkID}/addComponentToSwitch`, "POST", 
