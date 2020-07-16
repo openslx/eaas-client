@@ -163,6 +163,7 @@ export class Client extends EventTarget {
         console.log("Viewer disconnected successfully.")
     }
 
+    
     async attachNewEnv(sessionId, container, environmentRequest) 
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
@@ -386,7 +387,7 @@ export class Client extends EventTarget {
         }
     };
 
-    async detach(name, detachTime_minutes, customComponentName) {
+    async detach(name, detachTime_minutes) {
         if (!this.network)
             throw new Error("No network session available");
 
