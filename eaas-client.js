@@ -270,14 +270,16 @@ export class Client extends EventTarget {
         return result;
     }
 
-    async release() {
+    async release(destroyNetworks = false) {
         console.log("released");
         this.disconnect();
         clearInterval(this.pollStateIntervalId);
 
         if (this.network)
         {
-            // this.network.relase();
+            // we do not release by default network session, as they are detached by default
+            if(destroyNetworks)
+                this.network.relase();
             return;
         }
 
