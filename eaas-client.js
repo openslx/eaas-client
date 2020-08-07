@@ -75,12 +75,13 @@ export class Client extends EventTarget {
 
 
     async _pollState() {
+        console.log("poll state...")
         if (this.network) {
+            console.log("network keepalive");
             this.network.keepalive();
         }
 
         for (const session of this.sessions) {
-
             if(session.getNetwork() && !session.forceKeepalive)
                 continue;
 
@@ -190,6 +191,7 @@ export class Client extends EventTarget {
         if(_componentId) {
             componentSession = this.getSession(_componentId);
         }
+        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
 
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
