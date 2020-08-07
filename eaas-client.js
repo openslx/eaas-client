@@ -167,6 +167,7 @@ export class Client extends EventTarget {
     async attachNewEnv(sessionId, container, environmentRequest) 
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
+        session.sessionId = sessionId;
         this.load(session);
         
         let componentSession = await this.createComponent(environmentRequest);
@@ -185,6 +186,7 @@ export class Client extends EventTarget {
     async attach(sessionId, container, _componentId)
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+        session.sessionId = sessionId;
         this.load(session);
 
         let componentSession;
@@ -260,6 +262,8 @@ export class Client extends EventTarget {
         }
 
         this.network = new NetworkSession(this.API_URL, this.idToken);
+        console.log("load");
+        console.log(sessionId);
         this.network.load(sessionId, this.sessions, networkInfo);
     }
 
