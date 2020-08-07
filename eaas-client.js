@@ -27,7 +27,6 @@ export class Client extends EventTarget {
 
         this.deleteOnUnload = true;
 
-        this.networkId = null;
         this.params = null;
         this.mode = null;
         this.options = null;
@@ -80,7 +79,6 @@ export class Client extends EventTarget {
         }
 
         for (const session of this.sessions) {
-
             if(session.getNetwork() && !session.forceKeepalive)
                 continue;
 
@@ -166,6 +164,7 @@ export class Client extends EventTarget {
     async attachNewEnv(sessionId, container, environmentRequest) 
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
+        session.sessionId = sessionId;
         this.load(session);
         
         let componentSession = await this.createComponent(environmentRequest);
@@ -184,12 +183,14 @@ export class Client extends EventTarget {
     async attach(sessionId, container, _componentId)
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+        session.sessionId = sessionId;
         this.load(session);
 
         let componentSession;
         if(_componentId) {
             componentSession = this.getSession(_componentId);
         }
+        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
 
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
