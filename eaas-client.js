@@ -219,7 +219,7 @@ export class Client extends EventTarget {
             }
         }
         catch (e) {
-            this.release();
+            this.release(true);
             console.log(e);
             throw new ClientError("Starting environment session failed!", e);
         }
@@ -500,18 +500,20 @@ export class Client extends EventTarget {
         const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
 
-        let rtcConfig = undefined;
+        let configuredIceServers = [
+                { urls: 'stun:stun.l.google.com:19302'},
+        ];
+
         if(_url.hostname !== "localhost") {
-            rtcConfig = {
-                iceServers: [
-                    {   urls: "turn:" + _url.hostname,
-                        username: "eaas",
-                        credential: "eaas"
-                    }
-                ]
-            };
+            configuredIceServers.push(
+                {   urls: "turn:" + _url.hostname,
+                    username: "eaas",
+                    credential: "eaas"});
         }
 
+        const rtcConfig = {
+            iceServers: configuredIceServers
+        }
         console.log("Creating RTC peer connection...");
         this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
 
