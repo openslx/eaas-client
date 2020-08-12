@@ -1,204 +1,419 @@
-var EaasClient = EaasClient || {};
+import {NetworkSession} from "./lib/networkSession.js"
+import {ComponentSession} from "./lib/componentSession.js"
+import {ClientError, sendEsc, sendCtrlAltDel, _fetch, requestPointerLock} from "./lib/util.js"
+import {prepareAndLoadXpra} from "./lib/xpraWrapper.js"
+import EventTarget from "./third_party/event-target/esm/index.js"
 
-/**
- * Determines the resolution
- */
+export {sendEsc, sendCtrlAltDel, requestPointerLock};
+export {ClientError};
 
-EaasClient.Client = function (api_entrypoint, container) {
+function strParamsToObject(str) {
+    var result = {};
+    if (!str) return result; // return on empty string
 
-    // Clean up on window close
-    window.onbeforeunload = function () {
-        if(_this.deleteOnUnload)
-            this.release();
-    }.bind(this);
+    str.split("&").forEach(function (part) {
+        var item = part.split("=");
+        result[item[0]] = decodeURIComponent(item[1]);
+    });
+    return result;
+}
 
-    // default xpra values
-    this.xpraConf = {
-        xpraWidth: 640,
-        xpraHeight: 480,
-        xpraDPI: 96,
-        xpraEncoding: "jpeg"
-    };
+export class Client extends EventTarget {
+    constructor(api_entrypoint, idToken = null) {
+        super();
+        this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
+        this.container;
+        this.idToken = idToken;
 
-    this.setXpraConf = function (width, height, dpi, xpraEncoding) {
-        xpraConf = {
+        this.deleteOnUnload = true;
+
+        this.params = null;
+        this.mode = null;
+        this.options = null;
+
+        this.sessions = [];
+
+        /**
+         * component session attached to browser canvas
+         */
+        this.activeView = null;
+
+        this.envsComponentsData = [];
+
+        this.isConnected = false;
+
+        this.xpraConf = {
+            xpraWidth: 640,
+            xpraHeight: 480,
+            xpraDPI: 96,
+            xpraEncoding: "jpeg"
+        };
+
+        // ID for registered this.pollState() with setInterval()
+        this.pollStateIntervalId = null;
+
+        // Clean up on window close
+        window.addEventListener("beforeunload", () => {
+            if (this.deleteOnUnload)
+                this.release();
+        });
+    }
+
+    setXpraConf(width, height, dpi, xpraEncoding) {
+        this.xpraConf = {
             xpraWidth: width,
             xpraHeight: height,
             xpraDPI: dpi,
             xpraEncoding: xpraEncoding
         };
-    };
-
-    var _this = this;
-    _this.deleteOnUnload = true;
-    var API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
-
-    this.componentId = null;
-    this.eventSource = null;
-    this.networkTcpInfo = null;
-    this.networkId = null;
-    this.driveId = null;
-    this.params = null;
-    this.mode = null;
-    this.detached = false;
-    this.abort = false;
-    this.released = false;
-    this.envsComponentsData = [];
-
-    // ID for registered this.pollState() with setInterval()
-    this.pollStateIntervalId = null;
-
-    function formatStr(format) {
-        var args = Array.prototype.slice.call(arguments, 1);
-        return format.replace(/{(\d+)}/g, function (match, number) {
-            return typeof args[number] != 'undefined' ? args[number] : match;
-        });
     }
 
-    function strParamsToObject(str) {
-        var result = {};
-        if (!str) return result; // return on empty string
+    // ... token &&  { authorization : `Bearer ${token}`}, 
+    // ... obj && {"content-type" : "application/json" }
+    // ...obj && {body: JSON.stringify(obj) },
 
-        str.split("&").forEach(function (part) {
-            var item = part.split("=");
-            result[item[0]] = decodeURIComponent(item[1]);
-        });
-        return result;
-    }
 
-    async function removeNetworkComponent(netid, compid) {
-        console.log("Removing component " + compid + " from network " + netid);
-        try {
-            await $.ajax({
-                type: "DELETE",
-                url: API_URL + formatStr("/networks/{0}/components/{1}", netid, compid),
-                timeout: 10000,
-                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
-            });
-        }
-        catch (xhr) {
-            const json = $.parseJSON(xhr.responseText);
-            if (json.error !== null)
-                console.error("Server-Error:" + json.error);
-            if (json.detail !== null)
-                console.error("Server-Error Details:" + json.detail);
-            if (json.stacktrace !== null)
-                console.error("Server-Error Stacktrace:" + json.stacktrace);
-
-            console.error("Removing component failed!");
-            throw undefined;
+    async _pollState() {
+        if (this.network) {
+            this.network.keepalive();
         }
 
-        console.log("Component removed: " + compid);
+        for (const session of this.sessions) {
+            if(session.getNetwork() && !session.forceKeepalive)
+                continue;
+
+            let result = await session.getEmulatorState();
+            if (!result)
+                continue;
+
+            let emulatorState = result.state;
+
+            if (emulatorState == "OK")
+                session.keepalive();
+            else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
+                if(this.onEmulatorStopped)
+                    this.onEmulatorStopped();
+                session.keepalive();
+                this.dispatchEvent(new CustomEvent("error", { detail: `${emulatorState}` })); // .addEventListener("error", (e) => {})
+            }
+            else
+                this.dispatchEvent(new CustomEvent("error", { detail: session }));
+        }
     }
 
-    var isStarted = false;
-    var isConnected = false;
-    var emulatorState;
+    _onResize(width, height) {
 
-    this.pollState = function () {
-
-        if(_this.abort)
+        if(!this.container)
         {
-            if (_this.pollStateIntervalId)
-                clearInterval(_this.pollStateIntervalId);
-
-            _this.disconnect();
-            if(_this.eventSource)
-                _this.eventSource.close();
-
+            console.log("container null: ");
+            console.log(this);
             return;
         }
 
-        $.ajax({
-            type: "GET",
-            url: API_URL + formatStr("/components/{0}/state", _this.componentId),
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-        }).then(function (data, status, xhr) {
-                emulatorState = data.state;
-                if (emulatorState == "OK")
-                    _this.keepalive();
-                else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
-                    _this.keepalive();
-                    if(_this.onEmulatorStopped)
-                        _this.onEmulatorStopped();
-                }
-                else if (emulatorState == "INACTIVE") {
-                    location.reload();
-                } else
-                    _this._onFatalError("Invalid component state: " + this.emulatorState);
-            }).fail(function () {
-            _this._onFatalError("connection failed")
-        });
-    };
-
-    this._onFatalError = function (msg) {
-        if (this.pollStateIntervalId)
-            clearInterval(this.pollStateIntervalId);
-
-        this.disconnect();
-
-        if (this.onError) {
-            this.onError(msg || {"error": "No error message specified"});
-        }
-
-        console.error(msg);
-    };
-
-    this._onResize = function (width, height) {
-        container.style.width = width;
-        container.style.height = height;
+        this.container.style.width = width;
+        this.container.style.height = height;
 
         if (this.onResize) {
             this.onResize(width, height);
         }
-    };
-
-    this.keepalive = function () {
-        var url = null;
-
-        if (_this.networkId != null) {
-            if (typeof _this.envsComponentsData != "undefined"){
-                //FIXME we should send only one keepalive
-                for (let i = 0; i < _this.envsComponentsData.length; i++) {
-                     $.ajax({
-                        type: "POST",
-                        url: API_URL + formatStr("/components/{0}/keepalive", _this.envsComponentsData[i].id),
-                        headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-                     });
-                }
-            }
-            url = formatStr("/sessions/{0}/keepalive", _this.networkId);
-        } else if (_this.componentId != null) {
-            url = formatStr("/components/{0}/keepalive", _this.componentId);
-        }
-
-        $.ajax({
-           type: "POST",
-           url: API_URL + url,
-           headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        });
-    };
-
-    this.wsConnection = async function () {
-        if (_this.networkId == null) {
-            return null;
-        }
-
-        const url = `${API_URL}/networks/${this.networkId}/wsConnection`;
-        const res = await fetch(url, {headers:
-            localStorage.id_token ? {"authorization" : `Bearer ${localStorage.id_token}`} : {},
-        });
-        
-        if (!res.ok)
-            throw new Error(await res.text());
-
-        const url2 = new URL(await res.text(), API_URL);
-        if (url2.port === "443") url2.protocol = "wss";
-        return String(url2);
     }
 
-    this.establishGuacamoleTunnel = function (controlUrl) {
+    getActiveSession() {
+        return this.activeView;
+    }
+
+    /* 
+        needs to be a global client function, 
+        we may checkpoint more then a single machine in the future.
+    */
+    async checkpoint(request) {
+        let session = this.activeView;
+        this.disconnect();
+        return session.checkpoint(request);
+    }
+
+    // Disconnects viewer from a running session
+    disconnect() {
+        if (!this.activeView) {
+            return;
+        }
+
+        console.log("Disconnecting viewer...");
+        if (this.mode === "guac") {
+            this.guac.disconnect();
+            BWFLA.unregisterEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
+        }
+        else if (this.mode === "xpra") {
+            this.xpraClient.close();
+        }
+
+        if (this.rtcPeerConnection != null)
+            this.rtcPeerConnection.close();
+
+        let myNode = document.getElementById("emulator-container");
+        // it's supposed to be faster, than / myNode.innerHTML = ''; /
+        while (myNode.firstChild) {
+            myNode.removeChild(myNode.firstChild);
+        }
+        this.activeView.disconnect();
+        this.activeView = undefined;
+        this.container = undefined;
+        console.log("Viewer disconnected successfully.")
+    }
+
+    async attachNewEnv(sessionId, container, environmentRequest) 
+    {
+        let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
+        session.sessionId = sessionId;
+        this.load(session);
+        
+        let componentSession = await this.createComponent(environmentRequest);
+        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+
+        this._connectToNetwork(componentSession, sessionId);
+        componentSession.forceKeepalive = true;
+
+        this.network.sessionComponents.push(componentSession);
+        this.network.networkConfig.components.push({componentId: componentSession.componentId, networkLabel: "Temp Client"});
+        this.sessions.push(componentSession);
+
+        await this.connect(container, componentSession);
+    }
+
+    async attach(sessionId, container, _componentId)
+    {
+        let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+        session.sessionId = sessionId;
+        this.load(session);
+
+        let componentSession;
+        if(_componentId) {
+            componentSession = this.getSession(_componentId);
+        }
+        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+
+        console.log("attching component:" + componentSession);
+        await this.connect(container, componentSession);
+    }
+
+    async start(components, options) {
+        if(options) {
+            this.xpraConf.xpraEncoding = options.getXpraEncoding();
+        }
+
+        try {
+            const promisedComponents = components.map(async component => {
+                let componentSession = await this.createComponent(component);
+                    this.sessions.push(componentSession);
+                    if (component.isInteractive() === true) {
+                        this.activeView = componentSession;
+                    }
+                    return componentSession;
+            });
+            this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+            await Promise.all(promisedComponents);
+
+            if (options && options.isNetworkEnabled()) {
+                this.network = new NetworkSession(this.API_URL, this.idToken);
+                await this.network.startNetwork(this.sessions, options);
+            }
+        }
+        catch (e) {
+            this.release(true);
+            console.log(e);
+            throw new ClientError("Starting environment session failed!", e);
+        }
+    }
+
+    async createComponent(componentRequest) {
+        try {
+            let result = await _fetch(`${this.API_URL}/components`, "POST", componentRequest.build(), this.idToken);
+            let component = new ComponentSession(this.API_URL, componentRequest.environment, result.id, this.idToken);
+            component.setRemovableMediaList(result.removableMediaList);
+            component.setSessionRequestInfo(componentRequest);
+            console.log("Environment " + componentRequest.environment + " started.");
+
+           return component;
+        }
+        catch (error) {
+            throw new ClientError("Starting server-side component failed!", error);
+        }
+    }
+    
+    load(session)
+    {
+        const sessionId = session.sessionId;
+        const sessionComponents = session.components;
+        const networkInfo = session.network;
+
+        for(const sc of sessionComponents)
+        {
+            if(sc.type !== "machine")
+                continue;
+
+            if (this.sessions.filter((sessionComp) => sessionComp.componentId === sc.componentId).length > 0)
+                continue;
+            
+            let session = new ComponentSession(this.API_URL, sc.environmentId, sc.componentId, this.idToken);
+            this.sessions.push(session);
+        }
+
+        this.network = new NetworkSession(this.API_URL, this.idToken);
+        this.network.load(sessionId, this.sessions, networkInfo);
+    }
+
+    async _connectToNetwork(component, networkID) {
+        const result = await _fetch(`${this.API_URL}/networks/${networkID}/addComponentToSwitch`, "POST", 
+            {
+                componentId: component.getId(),
+            },
+            this.idToken);
+        return result;
+    }
+
+    async release(destroyNetworks = false) {
+        console.log("released");
+        this.disconnect();
+        clearInterval(this.pollStateIntervalId);
+
+        if (this.network)
+        {
+            // we do not release by default network session, as they are detached by default
+            if(destroyNetworks)
+                this.network.relase();
+            return;
+        }
+
+        let url;
+        for (const session of this.sessions) {
+            url = await session.stop()
+            await session.release();
+        }
+        this.sessions = [];
+        return url;
+    }
+
+    getSession(id) {
+        if (!this.network)
+            throw new Error("no sessions available");
+
+        return this.network.getSession(id);
+    }
+
+    getSessions() {
+        if (!this.network) {
+            return [];
+        }
+
+        const sessionInfo = [];
+        let networkSessions = this.network.getSessions();
+
+        for(let session of networkSessions)
+        {
+            const conf = this.network.getNetworkConfig(session.componentId);
+            sessionInfo.push({
+                id: conf.componentId,
+                title: conf.networkLabel
+            });
+        }
+        
+        return sessionInfo;
+
+    }
+
+    // Connects viewer to a running session
+    async connect(container, view) {
+        if (!view) {
+            console.log("no view defined. using first session");
+            view = this.sessions[0];    
+        }
+
+        if (this.activeView)
+            this.disconnect();
+
+        if (!view)
+            throw new Error("no active view possible");           
+        
+        this.activeView = view;
+
+        this.container = container;
+        console.log(`Connecting viewer... @ ${this.container}`);
+        try {
+            let result = await this.activeView.getControlUrl();
+            let connectViewerFunc, controlUrl;
+            let viewerData;
+
+            // Get the first ws+ethernet connector
+            const entries = Object.entries(result).filter(([k]) => k.match(/^ws\+ethernet\+/));
+            if (entries.length)
+                this.ethernetURL = entries[0][1];
+
+            // Guacamole connector?
+            if (result.guacamole) {
+                controlUrl = result.guacamole;
+                this.params = strParamsToObject(result.guacamole.substring(result.guacamole.indexOf("#") + 1));
+                connectViewerFunc = this._establishGuacamoleTunnel;
+                this.mode = "guac";
+            }
+            // XPRA connector
+            else if (result.xpra) {
+                controlUrl = result.xpra;
+                this.params = strParamsToObject(result.xpra.substring(result.xpra.indexOf("#") + 1));
+                connectViewerFunc = prepareAndLoadXpra;
+                this.mode = "xpra";
+                viewerData = this.xpraConf;
+            }
+            // WebEmulator connector
+            else if (result.webemulator) {
+                controlUrl = encodeURIComponent(JSON.stringify(result));
+                this.params = strParamsToObject(result.webemulator.substring(result.webemulator.indexOf("#") + 1));
+                connectViewerFunc = this._prepareAndLoadWebEmulator;
+            }
+            else {
+                throw Error("Unsupported connector type: " + result);
+            }
+            // Establish the connection
+            await connectViewerFunc.call(this, controlUrl, viewerData);
+            console.log("Viewer connected successfully.");
+            this.isConnected = true;
+
+            if (typeof result.audio !== "undefined")
+                this.initWebRtcAudio(result.audio);
+
+        }
+        catch (e) {
+            console.error("Connecting viewer failed!");
+            console.log(e);
+            this.activeView = undefined;
+        }
+    };
+
+    async detach(name, detachTime_minutes, customComponentName) {
+        if (!this.network)
+            throw new Error("No network session available");
+
+        this.network.detach(name, detachTime_minutes);
+        window.onbeforeunload = () => { };
+        this.disconnect();
+    }
+
+    async stopEnvironment() {
+        if (!this.isStarted)
+            return;
+
+        // let activeSession = this.activeView;
+        let results = [];
+        this.disconnect();
+        for (const session of this.sessions) {
+            let result = session.stop();
+            results.push({id: session.getId, result: result});
+        }
+
+        $(this.container).empty();
+        return results;
+    }
+
+    _establishGuacamoleTunnel(controlUrl) {
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX, y = window.scrollY;
             this.focus();
@@ -215,8 +430,12 @@ EaasClient.Client = function (api_entrypoint, container) {
         this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
         var displayElement = this.guac.getDisplay().getElement();
 
-        BWFLA.hideClientCursor(this.guac);
-        container.insertBefore(displayElement, container.firstChild);
+        this.guac.onerror = function(status) {
+            console.log("GUAC-ERROR-RESPONSE:", status.code, " -> ", status.message);
+        }
+
+        hideClientCursor(this.guac);
+        this.container.insertBefore(displayElement, this.container.firstChild);
 
         BWFLA.registerEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
         this.guac.connect();
@@ -251,731 +470,9 @@ EaasClient.Client = function (api_entrypoint, container) {
         if (this.onReady) {
             this.onReady();
         }
-
-        /*
-         oskeyboard = new Guacamole.OnScreenKeyboard("/emucomp/resources/layouts/en-us-qwerty.xml");
-
-         $('#keyboard-wrapper').addClass('keyboard-container');
-         $('#keyboard-wrapper').html(oskeyboard.getElement());
-
-         function resizeKeyboardTimer()
-         {
-         oskeyboard.resize($('#display > div').width()*0.95);
-         setTimeout(resizeKeyboardTimer, 200);
-         }
-
-         resizeKeyboardTimer();
-
-         oskeyboard.onkeydown = function (keysym) { guac.sendKeyEvent(1, keysym); };
-         oskeyboard.onkeyup = function (keysym) { guac.sendKeyEvent(0, keysym); };
-         */
-    };
-
-    this.getContainerResultUrl = function()
-    {
-        // console.log(_this.componentId);
-        if(_this.componentId == null){
-            this.onError("Component ID is null, please contact administrator");
-        }
-        return API_URL + formatStr("/components/{0}/result", _this.componentId);
-    };
-
-    this.startContainer = function(containerId, args)
-    {
-        var data = {};
-        data.type = "container";
-        data.environment = containerId;
-	    data.input_data = args.input_data;
-
-        console.log("Starting container " + containerId + "...");
-        var deferred = $.Deferred();
-
-        $.ajax({
-            type: "POST",
-            url: API_URL + "/components",
-            data: JSON.stringify(data),
-            contentType: "application/json",
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        }).then(function (data, status, xhr) {
-            console.log("container " + containerId + " started.");
-            _this.componentId = data.id;
-            _this.isStarted = true;
-            _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-            deferred.resolve();
-        },
-        function (xhr) {
-            _this._onFatalError($.parseJSON(xhr.responseText));
-            deferred.reject();
-        });
-        return deferred.promise();
-    };
-
-    /*
-     Method to start (connected) environments directly from constructed config.
-     If you want it simple, use window.client.startEnvironment(id, params);
-
-     ############################################
-      Example of Connected Environments:
-       var data = {};
-       data.type = "machine";
-       data.environment = "ENVIRONMENT1 ID";
-       var env = {data, visualize: false};
-
-       var data = {};
-       data.type = "machine";
-       data.environment = "ENVIRONMENT2 ID";
-       var env2 = {data, visualize: true};
-
-       window.client.start([env, env2], params)
-
-     ############################################
-       Example of input_data:
-
-        input_data[0] = {
-            type: "HDD",
-            partition_table_type: "MBR",
-            filesystem_type: "FAT32",
-            size_mb: 1024,
-            content: [
-                {
-                    action: "extract",
-                    compression_format: "TAR",
-                    url: "http://132.230.4.15/objects/ub/policy.tar",
-                    name: "test"
-                }
-            ]
-        };
-
-        var data = {};
-        data.type = "machine";
-        data.environment = "ENVIRONMENT1 ID";
-        data.input_data = input_data;
-     ############################################
-
-     * @param environments
-     * @param args
-     * @returns {*}
-     */
-    this.start = function (environments, args, attachId) {
-        this.tcpGatewayConfig = args.tcpGatewayConfig;
-        if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
-            _this.xpraConf.xpraEncoding = args.xpraEncoding;
-
-        var connectNetwork = function (envsComponentsData) {
-            const components = [];
-            for (let i = 0; i < envsComponentsData.length; i++) {
-                components.push({componentId: envsComponentsData[i].id});
-            }
-
-            $.ajax({
-                type: "POST",
-                url: API_URL + "/networks",
-                data: JSON.stringify({
-                    components: components,
-                    hasInternet: args.hasInternet ? true : false,
-                    enableDhcp : true,
-                    hasTcpGateway: args.hasTcpGateway ? true : false,
-                    tcpGatewayConfig : args.tcpGatewayConfig ? args.tcpGatewayConfig : {}
-                }),
-                contentType: "application/json",
-                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-            }).then(function (network_data, status, xhr) {
-                    _this.envsComponentsData = envsComponentsData;
-                    _this.networkId = network_data.id;
-                    _this.networkTcpInfo = network_data.networkUrls != null ? network_data.networkUrls.tcp : null;
-                    _this.isStarted = true;
-                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                    deferred.resolve();
-                },
-                function (xhr) {
-                    _this._onFatalError($.parseJSON(xhr.responseText));
-                    deferred.reject();
-                }
-           );
-        };
-
-        var connectEnvs = function(environments) {
-            var idsData = [];
-            for (let i = 0; i < environments.length; i++) {
-                $.ajax({
-                    type: "POST",
-                    url: API_URL + "/components",
-                    headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                    success: function (envData, status2, xhr2) {
-                        envData.env = environments[i];
-                        idsData.push(envData);
-                        if(environments[i].visualize == true){
-                            if(_this.componentId != null) {
-                                console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
-                                return;
-                            }
-                            _this.componentId = envData.id;
-                            _this.driveId = envData.driveId;
-                            var eventUrl = API_URL + "/components/" + envData.id + "/events";
-                            if(localStorage.getItem('id_token'))
-                                eventUrl += "?access_token="+ localStorage.getItem('id_token');
-                            _this.eventSource = new EventSource(eventUrl);
-                        }
-                    },
-                    async:false,
-                    data: JSON.stringify(environments[i].data),
-                    contentType: "application/json"
-                })
-            }
-            connectNetwork(idsData);
-        };
-
-        var deferred = $.Deferred();
-
-        if (attachId) {
-            if (environments.length > 1) {
-                _this._onFatalError("We don't support hot connection for multiple environments ... yet. ");
-                deferred.reject();
-                return deferred.promise();
-            }
-            // console.log(" I came to attachId section!" , environments[0]);
-
-            return this.startAndAttach(environments, args, attachId);
-        }
-
-        if (environments.length > 1 || args.enableNetwork) {
-            connectEnvs(environments)
-        } else {
-            $.ajax({
-                type: "POST",
-                url: API_URL + "/components",
-                data: JSON.stringify(environments[0].data),
-                contentType: "application/json",
-                headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-            })
-                .then(function (data, status, xhr) {
-                        _this.componentId = data.id;
-                        _this.driveId = data.driveId;
-
-                        var eventUrl = API_URL + "/components/" + data.id + "/events";
-                        if(localStorage.getItem('id_token'))
-                            eventUrl += "?access_token="+ localStorage.getItem('id_token');
-                        _this.eventSource = new EventSource(eventUrl);
-
-                        if (args.tcpGatewayConfig || args.hasInternet) {
-                            connectNetwork([data]);
-                        } else {
-                            console.log("Environment " + environments[0].data.environment + " started.");
-                            _this.isStarted = true;
-                            _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                            deferred.resolve();
-                        }
-                    },
-                    function (xhr) {
-                        _this._onFatalError($.parseJSON(xhr.responseText));
-                        deferred.reject();
-                    });
-        }
-
-        return deferred.promise();
-    };
-    /**
-     * FIXME merge with function with start(), remove duplicate code, refactor it and make stuff nicer
-     * @param environmentId
-     * @param args
-     * @param attachId
-     * @returns {*|jQuery}
-     */
-    /*
-   */
-    this.startAndAttach = function (environments, args, attachId) {
-        if (typeof args.xpraEncoding != "undefined" && args.xpraEncoding != null)
-            _this.xpraConf.xpraEncoding = args.xpraEncoding;
-
-        var attachToSwitch = function (clientData, networkID) {
-            // console.log("clientData.id " + clientData.id);
-            $.ajax({
-                type: "POST",
-                url: API_URL + "/networks/" + networkID + "/addComponentToSwitch",
-                data: JSON.stringify({
-                    componentId: clientData.id,
-                }),
-                contentType: "application/json",
-                headers: localStorage.getItem('id_token') ? {"Authorization": "Bearer " + localStorage.getItem('id_token')} : {}
-            }).then(function (status, xhr) {
-                    _this.isStarted = true;
-                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                    deferred.resolve();
-                },
-                function (xhr) {
-                    _this._onFatalError($.parseJSON(xhr.responseText));
-                    deferred.reject();
-                });
-        };
-
-        var connectEnvs = function(environments, attachId) {
-            var idsData = [];
-            for (let i = 0; i < environments.length; i++) {
-                $.ajax({
-                    type: "POST",
-                    url: API_URL + "/components",
-                    headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-                    success: function (envData, status2, xhr2) {
-                        idsData.push(envData);
-                        if (environments[i].visualize == true) {
-                            // console.log("_this.componentId " + _this.componentId);
-                            if (_this.componentId != null) {
-                                console.error("We support visualization of only one environment at the time!! Visualizing the last specified...");
-                                return;
-                            }
-                            _this.componentId = envData.id;
-                            _this.driveId = envData.driveId;
-                            var eventUrl = API_URL + "/components/" + envData.id + "/events";
-                            if (localStorage.getItem('id_token'))
-                                eventUrl += "?access_token=" + localStorage.getItem('id_token');
-                            _this.eventSource = new EventSource(eventUrl);
-                        }
-                    },
-                    async:false,
-                    data: JSON.stringify(environments[i].data),
-                    contentType: "application/json"
-                })
-            }
-            attachToSwitch(idsData[0], attachId);
-        };
-        var deferred = $.Deferred();
-        connectEnvs(environments, attachId);
-
-        return deferred.promise();
-    };
-
-
-    /**
-     * Method to support obsolete APIs and single environment sessions
-     * @Deprecated
-     * @param environmentId
-     * @param args
-     * @returns {*}
-     */
-    this.startEnvironment = function (environmentId, args, input_data) {
-        var data = {};
-        data.type = "machine";
-        data.environment = environmentId;
-        if (typeof input_data !== "undefined" && input_data !=  null) {
-            data.input_data = [];
-            data.input_data[0] = input_data;
-        }
-
-        if (typeof args !== "undefined") {
-            data.keyboardLayout = args.keyboardLayout;
-            data.keyboardModel = args.keyboardModel;
-            data.object = args.object;
-
-            if (args.object == null) {
-                data.software = args.software;
-            }
-            data.userId = args.userId;
-            if(args.lockEnvironment)
-                data.lockEnvironment = true;
-        }
-        return this.start([{data, visualize: true}], args);
-    };
-
-
-    // Connects viewer to a running session
-    this.connect = function () {
-        var deferred = $.Deferred();
-
-        if (!_this.isStarted || _this.abort) {
-
-            if(!_this.isStarted)
-                _this._onFatalError("Environment was not started properly!");
-            deferred.reject();
-            return deferred.promise();
-        }
-
-        console.log("Connecting viewer...");
-
-        $.ajax({
-            type: "GET",
-            url: API_URL + formatStr("/components/{0}/controlurls", _this.componentId),
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-            async: false,
-        }).done(function (data, status, xhr) {
-                var connectViewerFunc;
-                var controlUrl;
-
-                // Get the first ws+ethernet connector
-                const entries = Object.entries(data).filter(([k]) => k.match(/^ws\+ethernet\+/));
-                if (entries.length) _this.ethernetURL = entries[0][1];
-
-                // Guacamole connector?
-                if (typeof data.guacamole !== "undefined") {
-                    controlUrl = data.guacamole;
-                    _this.params = strParamsToObject(data.guacamole.substring(data.guacamole.indexOf("#") + 1));
-                    connectViewerFunc = _this.establishGuacamoleTunnel;
-                    _this.mode = "guac";
-                }
-                // XPRA connector
-                else if (typeof data.xpra !== "undefined") {
-                    controlUrl = data.xpra;
-                    _this.params = strParamsToObject(data.xpra.substring(data.xpra.indexOf("#") + 1));
-                    connectViewerFunc = _this.prepareAndLoadXpra;
-                    _this.mode = "xpra";
-                }
-                // WebEmulator connector
-                else if (typeof data.webemulator !== "undefined") {
-                    controlUrl = encodeURIComponent(JSON.stringify(data));
-                    _this.params = strParamsToObject(data.webemulator.substring(data.webemulator.indexOf("#") + 1));
-                    connectViewerFunc = _this.prepareAndLoadWebEmulator;
-                }
-                else {
-                    console.error("Unsupported connector type: " + data);
-                    deferred.reject();
-                    return;
-                }
-
-                // Establish the connection
-                connectViewerFunc.call(_this, controlUrl);
-                console.log("Viewer connected successfully.");
-                _this.isConnected = true;
-
-                if (typeof data.audio !== "undefined")
-                    _this.initWebRtcAudio(data.audio);
-
-                deferred.resolve();
-            })
-            .fail(function (xhr) {
-                console.error("Connecting viewer failed!")
-                _this._onFatalError($.parseJSON(xhr.responseText))
-                deferred.reject();
-            });
-
-        return deferred.promise();
-    };
-
-    this.detach = async function (name, detachTime_minutes, customComponentName) {
-        if(_this.detached)
-            return;
-
-        let url = API_URL + formatStr("/sessions/{0}/detach", _this.networkId);
-        const res = await fetch(url, {
-            method: "POST",
-            headers: {
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                lifetime: detachTime_minutes,
-                lifetime_unit: "minutes",
-                sessionName: name,
-                componentTitle: {componentName: customComponentName, componentId: _this.componentId}
-            }),
-        });
-        if (res.status !== 204) {
-            throw new Error("Session cannot be detached!");
-        }
-        _this.detached = true;
-        window.onbeforeunload = () => {};
-
-       _this.disconnect();
-        if (_this.pollStateIntervalId)
-              clearInterval(_this.pollStateIntervalId);
-    };
-
-    this.getProxyURL = async function ({
-        tcpGatewayConfig: config = this.tcpGatewayConfig,
-        localPort = "8080",
-        localIP = "127.0.0.1",
-    } = {}) {
-        const eaasURL = new URL("web+eaas-proxy:");
-        eaasURL.search = encodeURIComponent(JSON.stringify([
-            `${localIP}:${localPort}`,
-            await this.wsConnection(),
-            "",
-            "dhcp",
-            config.serverIp,
-            config.serverPort,
-        ]));
-        return String(eaasURL);
-    };
-
-    // Disconnects viewer from a running session
-    this.disconnect = function () {
-        var deferred = $.Deferred();
-
-        if (!this.isConnected) {
-            deferred.reject();
-            return deferred.promise();
-        }
-
-        console.log("Disconnecting viewer...");
-
-        if (_this.rtcPeerConnection != null)
-            _this.rtcPeerConnection.close();
-
-        if (_this.mode === "guac") {
-            this.guac.disconnect();
-        }
-        else if (_this.mode === "xpra") {
-            _this.xpraClient.close();
-        }
-
-        var myNode = document.getElementById("emulator-container");
-        // it's supposed to be faster, than / myNode.innerHTML = ''; /
-        while (myNode && myNode.firstChild) {
-            myNode.removeChild(myNode.firstChild);
-        }
-
-        console.log("Viewer disconnected successfully.")
-        this.isConnected = false;
-        deferred.resolve();
-
-        return deferred.promise();
-    };
-
-    // Checkpoints a running session
-    this.checkpoint = async function (request) {
-        if (!_this.isStarted) {
-            _this._onFatalError("Environment was not started properly!");
-            throw undefined;
-        }
-
-        if (_this.networkId != null) {
-            // Remove the main component from the network group first!
-            await removeNetworkComponent(_this.networkId, _this.componentId);
-        }
-
-        console.log("Checkpointing session...");
-        try {
-            const data = await $.ajax({
-                type: "POST",
-                url: API_URL + formatStr("/components/{0}/checkpoint", _this.componentId),
-                timeout: 60000,
-                contentType: "application/json",
-                data: JSON.stringify(request),
-                headers: localStorage.getItem('id_token') ? { "Authorization": "Bearer " + localStorage.getItem('id_token') } : {}
-            });
-
-            const envid = data.envId;
-            console.log("Checkpoint created: " + envid);
-            return envid;
-        }
-        catch (xhr) {
-            var json = $.parseJSON(xhr.responseText);
-            if (json.message !== null)
-                console.error("Server-Error:" + json.message);
-
-            console.error("Checkpointing failed!");
-            throw undefined;
-        }
-    };
-
-    this.getScreenshotUrl = function () {
-        return API_URL + formatStr("/components/{0}/screenshot", _this.componentId);
-    };
-
-    this.downloadPrint = function (label)
-    {
-        return API_URL + formatStr("/components/{0}/downloadPrintJob?label={1}", _this.componentId, encodeURI(label));
     }
 
-    this.getPrintJobs = function (successFn, errorFn) {
-        $.ajax({
-            type: "GET",
-            url: API_URL + formatStr("/components/{0}/printJobs", _this.componentId),
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {},
-            async: false,
-        }).done(function (data, status, xhr) {
-            successFn(data);
-        }).fail(function (xhr) {
-        if(errorFn)
-            errorFn(xhr);
-        });
-    };
-
-    this.getEmulatorState = function () {
-        if (typeof(emulatorState) !== "undefined")
-            return emulatorState;
-        else {
-            console.warn("emulator state is not defined yet!");
-            return "undefined";
-        }
-    };
-
-    this.stopEnvironment = async function (keepSession = false) {
-        let result = null;
-        if (!_this.isStarted)
-            return;
-
-        if (!keepSession && _this.pollStateIntervalId)
-            clearInterval(_this.pollStateIntervalId);
-
-        if(_this.detached === false) {
-            let url = API_URL + formatStr("/components/{0}/stop", _this.componentId);
-            let _res = fetch(url, {method: 'GET', 
-                headers:
-                localStorage.id_token ? {"authorization" : `Bearer ${localStorage.id_token}`} : {},
-            });
-            let res = await _res;
-            try {
-                result = await res.json();
-            } catch(error) {result = null;}
-        }
-        _this.isStarted = false;
-        $(container).empty();
-        return result;
-    };
-
-    this.clearTimer = function () {
-        clearInterval(this.keepaliveIntervalId);
-    };
-
-    this.release = async function () {
-        if (_this.released)
-            return;
-
-        console.log("release");
-
-        _this.released = true;
-        _this.envsComponentsData = [];
-        _this.abort = true;
-        this.clearTimer();
-
-        if (_this.eventSource)
-            _this.eventSource.close();
-
-        var result = this.disconnect();
-        while (result.state() === "pending") {
-            continue;  // Wait for completion!
-        }
-
-        await this.stopEnvironment();
-
-        if (_this.detached === false) {
-            if (!_this.componentId)
-                return;
-
-            return $.ajax({
-                type: "DELETE",
-                url: API_URL + formatStr("/components/{0}", _this.componentId),
-                headers: localStorage.getItem('id_token') ? {"Authorization": "Bearer " + localStorage.getItem('id_token')} : {},
-                async: true,
-            });
-        }
-
-
-    };
-
-    this.sendEsc = function() {
-        this.guac.sendKeyEvent(1, 0xff1b);
-        this.guac.sendKeyEvent(0, 0xff1b);
-    };
-
-
-    this.sendCtrlAltDel = async function()
-    {
-        const pressKey = async (key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout} = {timeout: 100}, el = document.getElementById("emulator-container").firstElementChild) => {
-         if (ctrlKey) {
-             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Control", keyCode: 17, bubbles: true}));
-             await new Promise(r => setTimeout(r, 100));
-         }
-         if (altKey) {
-             el.dispatchEvent(new KeyboardEvent("keydown", {key: "Alt", keyCode: 18, bubbles: true}));
-             await new Promise(r => setTimeout(r, 100));
-         }
-         el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
-         await new Promise(r => setTimeout(r, 100));
-         el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
-         if (altKey) {
-             await new Promise(r => setTimeout(r, 100));
-             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Alt", keyCode: 18, bubbles: true}));
-         }
-         if (ctrlKey) {
-             await new Promise(r => setTimeout(r, 100));
-             el.dispatchEvent(new KeyboardEvent("keyup", {key: "Control", keyCode: 17, bubbles: true}));
-         }
-        };
-        pressKey("Delete", 46, {altKey: true, ctrlKey: true, metaKey: true})
-    };
-
-    this.snapshot = function (postObj, onChangeDone, errorFn) {
-        $.ajax({
-            type: "POST",
-            url: API_URL + formatStr("/components/{0}/snapshot", _this.componentId),
-            data: JSON.stringify(postObj),
-            contentType: "application/json",
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        }).then(function (data, status, xhr) {
-            onChangeDone(data, status);
-        }).fail(function(xhr, textStatus, error) {
-            if(errorFn)
-                errorFn(error);
-            else {
-                console.log(xhr.statusText);
-                console.log(textStatus);
-                console.log(error);
-            }
-        });
-    };
-
-    this.changeMedia = function (postObj, onChangeDone) {
-        $.ajax({
-            type: "POST",
-            url: API_URL + formatStr("/components/{0}/changeMedia", _this.componentId),
-            data: JSON.stringify(postObj),
-            contentType: "application/json",
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        }).then(function (data, status, xhr) {
-            onChangeDone(data, status);
-        });
-    };
-
-    this.prepareAndLoadXpra = function (xpraUrl) {
-        /*
-         search for xpra path, in order to include it to filePath
-         */
-        var scripts = document.getElementsByTagName("script");
-        for (var prop in scripts) {
-            var searchingAim = "eaas-client.js";
-            if (typeof(scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
-                var eaasClientPath = scripts[prop].src;
-            }
-        }
-        if(typeof eaasClientPath == "undefined") {
-            xpraPath = "xpra/";
-        } else {
-            var xpraPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "xpra/";
-        }
-        jQuery.when(
-            jQuery.getScript(xpraPath + '/js/lib/zlib.js'),
-
-            jQuery.getScript(xpraPath + '/js/lib/aurora/aurora.js'),
-            jQuery.getScript(xpraPath + '/js/lib/lz4.js'),
-            jQuery.getScript(xpraPath + '/js/lib/jquery-ui.js'),
-            jQuery.getScript(xpraPath + '/js/lib/jquery.ba-throttle-debounce.js'),
-            jQuery.Deferred(function (deferred) {
-                jQuery(deferred.resolve);
-            })).done(function () {
-            jQuery.when(
-                jQuery.getScript(xpraPath + '/js/lib/bencode.js'),
-                jQuery.getScript(xpraPath + '/js/lib/forge.js'),
-                jQuery.getScript(xpraPath + '/js/lib/wsworker_check.js'),
-                jQuery.getScript(xpraPath + '/js/lib/broadway/Decoder.js'),
-                jQuery.getScript(xpraPath + '/js/lib/aurora/aurora-xpra.js'),
-                jQuery.getScript(xpraPath + '/eaas-xpra.js'),
-                jQuery.getScript(xpraPath + '/js/Keycodes.js'),
-                jQuery.getScript(xpraPath + '/js/Utilities.js'),
-                jQuery.getScript(xpraPath + '/js/Notifications.js'),
-                jQuery.getScript(xpraPath + '/js/MediaSourceUtil.js'),
-                jQuery.getScript(xpraPath + '/js/Window.js'),
-                jQuery.getScript(xpraPath + '/js/Protocol.js'),
-                jQuery.getScript(xpraPath + '/js/Client.js'),
-
-                jQuery.Deferred(function (deferred) {
-                    jQuery(deferred.resolve);
-                })).done(function () {
-                   _this.xpraClient =  loadXpra(xpraUrl, xpraPath, _this.xpraConf, _this);
-                }
-            )
-        })
-    };
-
-    this.prepareAndLoadWebEmulator = function (url) {
+    _prepareAndLoadWebEmulator(url) {
         /*
          search for eaas-client.js path, in order to include it to filePath
          */
@@ -983,83 +480,54 @@ EaasClient.Client = function (api_entrypoint, container) {
         var eaasClientPath = "";
         for (var prop in scripts) {
             var searchingAim = "eaas-client.js";
-            if (typeof(scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
-                var eaasClientPath = scripts[prop].src;
+            if (typeof (scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
+                eaasClientPath = scripts[prop].src;
             }
         }
         var webemulatorPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "webemulator/";
         var iframe = document.createElement("iframe");
         iframe.setAttribute("style", "width: 100%; height: 600px;");
         iframe.src = webemulatorPath + "#controlurls=" + url;
-        container.appendChild(iframe);
-    };
-
-    this.startDockerEnvironment = function (environmentId, args) {
-        var data = {};
-        data.type = "container";
-        data.environment = environmentId;
-
-        if (typeof args !== "undefined") {
-            data.keyboardLayout = args.keyboardLayout;
-            data.keyboardModel = args.keyboardModel;
-            data.object = args.object;
-
-            if (args.object == null) {
-                data.software = args.software;
-            }
-            data.userContext = args.userContext;
-        }
-
-        var deferred = $.Deferred();
-
-        console.log("Starting environment " + environmentId + "...");
-        $.ajax({
-            type: "POST",
-            url: API_URL + "/components",
-            data: JSON.stringify(data),
-            contentType: "application/json",
-            headers: localStorage.getItem('id_token') ? {"Authorization" : "Bearer " + localStorage.getItem('id_token')} : {}
-        })
-            .then(function (data, status, xhr) {
-                    console.log("Environment " + environmentId + " started.");
-                    _this.componentId = data.id;
-                    _this.driveId = data.driveId;
-                    _this.isStarted = true;
-                    _this.pollStateIntervalId = setInterval(_this.pollState, 1500);
-                    deferred.resolve();
-                },
-                function (xhr) {
-                    _this._onFatalError($.parseJSON(xhr.responseText));
-                    deferred.reject();
-                });
-
-        return deferred.promise();
-    };
-
+        this.container.appendChild(iframe);
+    }
 
     // WebRTC based sound
-    this.initWebRtcAudio = function (url) {
-        const client = _this;
+    async initWebRtcAudio (url) {
+        //const audioStreamElement = document.createElement('audio');
+        //audioStreamElement.controls = true;
+        //document.documentElement.appendChild(audioStreamElement);
+
+        await fetch(url + '?connect', { method: 'POST' });
+
+        let _url = new URL(url);
+        console.log("using host: " + _url.hostname + " for audio connection");
+        const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
 
+        let configuredIceServers = [
+                { urls: 'stun:stun.l.google.com:19302'},
+        ];
+
+        if(_url.hostname !== "localhost") {
+            configuredIceServers.push(
+                {   urls: "turn:" + _url.hostname,
+                    username: "eaas",
+                    credential: "eaas"});
+        }
+
         const rtcConfig = {
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" }
-            ]
-        };
-
+            iceServers: configuredIceServers
+        }
         console.log("Creating RTC peer connection...");
-        client.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
-        client.rtcPeerConnection.connected = false;
+        this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
 
-        client.rtcPeerConnection.onicecandidate = async (event) => {
-            if (event.candidate == null) {
-                console.log("No ICE candidate found!");
-                client.rtcPeerConnection.connected = true;
+        this.rtcPeerConnection.onicecandidate = async (event) => {
+            if (!event.candidate) {
+                console.log("ICE candidate exchange finished!");
                 return;
             }
 
-            console.log("Sending ICE candidate to server...");
+            console.log("Sending ICE candidate to server...", event.candidate);
 
             const body = {
                 type: 'ice',
@@ -1084,7 +552,7 @@ EaasClient.Client = function (api_entrypoint, container) {
         };
         */
 
-        client.rtcPeerConnection.onaddstream = async (event) => {
+        this.rtcPeerConnection.onaddstream = async (event) => {
             console.log("Remote stream received");
             // HACK: Work around https://bugs.chromium.org/p/chromium/issues/detail?id=933677
             new Audio().srcObject = event.stream;
@@ -1092,26 +560,36 @@ EaasClient.Client = function (api_entrypoint, container) {
                 .connect(audioctx.destination);
         };
 
+        const onServerError = (reason) => {
+            console.log("Stop polling control-messages! Reason:", reason);
+        };
+
         const onServerMessage = async (response) => {
+            if (!response.ok) {
+                console.log("Stop polling control-messages, server returned:", response.status);
+                return;
+            }
+
             try {
-            const message = await response.json();
-            if (message) {
-                try {
+                const message = await response.json();
+                if (message) {
                     switch (message.type) {
                         case 'ice':
                             console.log("Remote ICE candidate received");
                             console.log(message.data.candidate);
                             const candidate = new RTCIceCandidate(message.data);
-                            await client.rtcPeerConnection.addIceCandidate(candidate);
+
+                            await this.rtcPeerConnection.addIceCandidate(candidate);
                             break;
 
                         case 'sdp':
                             console.log("Remote SDP offer received");
                             console.log(message.data.sdp);
                             const offer = new RTCSessionDescription(message.data);
-                            await client.rtcPeerConnection.setRemoteDescription(offer);
-                            const answer = await client.rtcPeerConnection.createAnswer();
-                            await client.rtcPeerConnection.setLocalDescription(answer);
+
+                            await this.rtcPeerConnection.setRemoteDescription(offer);
+                            const answer = await this.rtcPeerConnection.createAnswer();
+                            await this.rtcPeerConnection.setLocalDescription(answer);
                             console.log("SDP-Answer: ", answer.sdp);
 
                             const body = {
@@ -1129,27 +607,21 @@ EaasClient.Client = function (api_entrypoint, container) {
 
                             break;
 
+                        case 'eos':
+                            console.log("Stop polling control-messages");
+                            return;
+
                         default:
                             console.error("Unsupported message type: " + message.type);
                     }
                 }
-                catch (error) {
-                    console.log(error);
-                }
             }
-            
-        }
-        catch(error) {}
+            catch (error) {
+                console.log(error);
+            }
 
             // start next long-polling request
-            /*
-            if (client.rtcPeerConnection.connected)
-                console.log("Stop polling control-messages");
-            else 
-            */
-            
-            fetch(url).then(onServerMessage);
-
+            fetch(url).then(onServerMessage, onServerError);
         };
 
         fetch(url).then(onServerMessage);
@@ -1174,8 +646,7 @@ EaasClient.Client = function (api_entrypoint, container) {
 var BWFLA = BWFLA || {};
 
 // Method to attach a callback to an event
-BWFLA.registerEventCallback = function(target, eventName, callback)
-{
+BWFLA.registerEventCallback = function (target, eventName, callback) {
     var event = 'on' + eventName;
 
     if (!(event in target)) {
@@ -1197,11 +668,11 @@ BWFLA.registerEventCallback = function(target, eventName, callback)
 
     // If required, initialize handler management function
     if (target[event] == null) {
-        target[event] = function() {
+        target[event] = function () {
             var params = arguments;  // Parameters to the original callback
 
             // Call all registered callbacks one by one
-            callbacks.forEach(function(func) {
+            callbacks.forEach(function (func) {
                 func.apply(target, params);
             });
         };
@@ -1210,8 +681,7 @@ BWFLA.registerEventCallback = function(target, eventName, callback)
 
 
 // Method to unregister a callback for an event
-BWFLA.unregisterEventCallback = function(target, eventName, callback)
-{
+BWFLA.unregisterEventCallback = function (target, eventName, callback) {
     // Look in the specified target for the callback and
     // remove it from the execution chain for this event
 
@@ -1228,16 +698,14 @@ BWFLA.unregisterEventCallback = function(target, eventName, callback)
 };
 
 /** Custom mouse-event handlers for use with the Guacamole.Mouse */
-var BwflaMouse = function(client)
-{
+var BwflaMouse = function (client) {
     var events = [];
     var handler = null;
     var waiting = false;
 
 
     /** Adds a state's copy to the current event-list. */
-    function addEventCopy(state)
-    {
+    function addEventCopy(state) {
         var copy = new Guacamole.Mouse.State(state.x, state.y, state.left,
             state.middle, state.right, state.up, state.down);
 
@@ -1245,8 +713,7 @@ var BwflaMouse = function(client)
     }
 
     /** Sets a new timeout-callback, replacing the old one. */
-    function setNewTimeout(callback, timeout)
-    {
+    function setNewTimeout(callback, timeout) {
         if (handler != null)
             window.clearTimeout(handler);
 
@@ -1254,8 +721,7 @@ var BwflaMouse = function(client)
     }
 
     /** Handler, called on timeout. */
-    function onTimeout()
-    {
+    function onTimeout() {
         while (events.length > 0)
             client.sendMouseState(events.shift());
 
@@ -1265,119 +731,37 @@ var BwflaMouse = function(client)
 
 
     /** Handler for mouse-down events. */
-    this.onmousedown = function(state)
-    {
+    this.onmousedown = function (state) {
         setNewTimeout(onTimeout, 100);
         addEventCopy(state);
         waiting = true;
     };
 
     /** Handler for mouse-up events. */
-    this.onmouseup = function(state)
-    {
+    this.onmouseup = function (state) {
         setNewTimeout(onTimeout, 150);
         addEventCopy(state);
         waiting = true;
     };
 
     /** Handler for mouse-move events. */
-    this.onmousemove = function(state)
-    {
+    this.onmousemove = function (state) {
         if (waiting == true)
             addEventCopy(state);
         else client.sendMouseState(state);
     };
 };
 
-var BWFLA = BWFLA || {};
-
-
-/** Requests a pointer-lock on given element, if supported by the browser. */
-BWFLA.requestPointerLock = function(target, event)
-{
-    function lockPointer() {
-        var havePointerLock = 'pointerLockElement' in document
-            || 'mozPointerLockElement' in document
-            || 'webkitPointerLockElement' in document;
-
-        if (!havePointerLock) {
-            var message = "Your browser does not support the PointerLock API!\n"
-                + "Using relative mouse is not possible.\n\n"
-                + "Mouse input will be disabled for this virtual environment.";
-
-            console.warn(message);
-            alert(message);
-            return;
-        }
-
-        // Activate pointer-locking
-        target.requestPointerLock = target.requestPointerLock
-            || target.mozRequestPointerLock
-            || target.webkitRequestPointerLock;
-
-        target.requestPointerLock();
-    };
-
-    function enableLockEventListener()
-    {
-        target.addEventListener(event, lockPointer, false);
-    };
-
-    function disableLockEventListener()
-    {
-        target.removeEventListener(event, lockPointer, false);
-    };
-
-    function onPointerLockChange() {
-        if (document.pointerLockElement === target
-            || document.mozPointerLockElement === target
-            || document.webkitPointerLockElement === target) {
-            // Pointer was just locked
-            console.debug("Pointer was locked!");
-            target.isPointerLockEnabled = true;
-            disableLockEventListener();
-        } else {
-            // Pointer was just unlocked
-            console.debug("Pointer was unlocked.");
-            target.isPointerLockEnabled = false;
-            enableLockEventListener();
-        }
-    };
-
-    function onPointerLockError(error) {
-        var message = "Pointer lock failed!";
-        console.warn(message);
-        alert(message);
-    }
-
-    // Hook for pointer lock state change events
-    document.addEventListener('pointerlockchange', onPointerLockChange, false);
-    document.addEventListener('mozpointerlockchange', onPointerLockChange, false);
-    document.addEventListener('webkitpointerlockchange', onPointerLockChange, false);
-
-    // Hook for pointer lock errors
-    document.addEventListener('pointerlockerror', onPointerLockError, false);
-    document.addEventListener('mozpointerlockerror', onPointerLockError, false);
-    document.addEventListener('webkitpointerlockerror', onPointerLockError, false);
-
-    enableLockEventListener();
-
-    // Set flag for relative-mouse mode
-    target.isRelativeMouse = true;
-};
-
 
 /** Hides the layer containing client-side mouse-cursor. */
-BWFLA.hideClientCursor = function(guac)
-{
+export function hideClientCursor(guac) {
     var display = guac.getDisplay();
     display.showCursor(false);
-};
+}
 
 
 /** Shows the layer containing client-side mouse-cursor. */
-BWFLA.showClientCursor = function(guac)
-{
+export function showClientCursor(guac) {
     var display = guac.getDisplay();
     display.showCursor(true);
-};
+}
