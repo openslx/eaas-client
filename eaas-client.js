@@ -1,10 +1,10 @@
 import {NetworkSession} from "./lib/networkSession.js"
 import {ComponentSession} from "./lib/componentSession.js"
-import {ClientError, sendEsc, sendCtrlAltDel, _fetch, requestPointerLock} from "./lib/util.js"
+import {ClientError, sendEsc, sendCtrlAltDel, sendAltTab, _fetch, requestPointerLock} from "./lib/util.js"
 import {prepareAndLoadXpra} from "./lib/xpraWrapper.js"
 import EventTarget from "./third_party/event-target/esm/index.js"
 
-export {sendEsc, sendCtrlAltDel, requestPointerLock};
+export {sendEsc, sendCtrlAltDel, sendAltTab, requestPointerLock};
 export {ClientError};
 
 function strParamsToObject(str) {
@@ -27,7 +27,6 @@ export class Client extends EventTarget {
 
         this.deleteOnUnload = true;
 
-        this.networkId = null;
         this.params = null;
         this.mode = null;
         this.options = null;
@@ -80,7 +79,6 @@ export class Client extends EventTarget {
         }
 
         for (const session of this.sessions) {
-
             if(session.getNetwork() && !session.forceKeepalive)
                 continue;
 
@@ -167,6 +165,7 @@ export class Client extends EventTarget {
     async attachNewEnv(sessionId, container, environmentRequest) 
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
+        session.sessionId = sessionId;
         this.load(session);
         
         let componentSession = await this.createComponent(environmentRequest);
@@ -185,12 +184,14 @@ export class Client extends EventTarget {
     async attach(sessionId, container, _componentId)
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+        session.sessionId = sessionId;
         this.load(session);
 
         let componentSession;
         if(_componentId) {
             componentSession = this.getSession(_componentId);
         }
+        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
 
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
@@ -219,7 +220,7 @@ export class Client extends EventTarget {
             }
         }
         catch (e) {
-            this.release();
+            this.release(true);
             console.log(e);
             throw new ClientError("Starting environment session failed!", e);
         }
@@ -271,15 +272,16 @@ export class Client extends EventTarget {
         return result;
     }
 
-    async release() {
-
+    async release(destroyNetworks = false) {
         console.log("released");
         this.disconnect();
         clearInterval(this.pollStateIntervalId);
 
         if (this.network)
         {
-            this.network.relase();
+            // we do not release by default network session, as they are detached by default
+            if(destroyNetworks)
+                this.network.relase();
             return;
         }
 
@@ -499,18 +501,20 @@ export class Client extends EventTarget {
         const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
 
-        let rtcConfig = undefined;
+        let configuredIceServers = [
+                { urls: 'stun:stun.l.google.com:19302'},
+        ];
+
         if(_url.hostname !== "localhost") {
-            rtcConfig = {
-                iceServers: [
-                    {   urls: "turn:" + _url.hostname,
-                        username: "eaas",
-                        credential: "eaas"
-                    }
-                ]
-            };
+            configuredIceServers.push(
+                {   urls: "turn:" + _url.hostname,
+                    username: "eaas",
+                    credential: "eaas"});
         }
 
+        const rtcConfig = {
+            iceServers: configuredIceServers
+        }
         console.log("Creating RTC peer connection...");
         this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
 
