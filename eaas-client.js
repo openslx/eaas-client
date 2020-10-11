@@ -402,8 +402,8 @@ export class Client extends EventTarget {
         let results = [];
         this.disconnect();
         for (const session of this.sessions) {
-            let result = session.stop();
-            results.push({id: session.getId, result: result});
+            let result = await session.stop();
+            results.push({id: session.getId(), result: result});
         }
 
         $(this.container).empty();
