@@ -393,7 +393,7 @@ export class Client extends EventTarget {
         if (!this.network)
             throw new Error("No network session available");
 
-        this.network.detach(name, detachTime_minutes);
+        await this.network.detach(name, detachTime_minutes);
         window.onbeforeunload = () => { };
         this.disconnect();
     }
