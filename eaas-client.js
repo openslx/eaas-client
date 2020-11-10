@@ -272,7 +272,7 @@ export class Client extends EventTarget {
     }
 
     async release(destroyNetworks = false) {
-        console.log("released");
+        console.log("released: " + destroyNetworks);
         this.disconnect();
         clearInterval(this.pollStateIntervalId);
 
