@@ -397,7 +397,7 @@ export class Client extends EventTarget {
         this.disconnect();
     }
 
-    async stopEnvironment() {
+    async stop() {
         // let activeSession = this.activeView;
         let results = [];
         this.disconnect();
