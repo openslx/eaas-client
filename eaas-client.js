@@ -280,7 +280,7 @@ export class Client extends EventTarget {
         {
             // we do not release by default network session, as they are detached by default
             if(destroyNetworks)
-                this.network.relase();
+                await this.network.relase();
             return;
         }
 
