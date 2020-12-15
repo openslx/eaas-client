@@ -88,7 +88,7 @@ export class Client extends EventTarget {
 
             let emulatorState = result.state;
 
-            if (emulatorState == "OK")
+            if (emulatorState == "OK" || emulatorState == "READY")
                 session.keepalive();
             else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                 if(this.onEmulatorStopped)
@@ -195,7 +195,7 @@ export class Client extends EventTarget {
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
     }
-
+    
     async start(components, options) {
         if(options) {
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
