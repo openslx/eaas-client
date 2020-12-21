@@ -88,7 +88,7 @@ export class Client extends EventTarget {
 
             let emulatorState = result.state;
 
-            if (emulatorState == "OK")
+            if (emulatorState == "OK" || emulatorState == "READY")
                 session.keepalive();
             else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                 if(this.onEmulatorStopped)
@@ -152,7 +152,7 @@ export class Client extends EventTarget {
 
         let myNode = document.getElementById("emulator-container");
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
-        while (myNode.firstChild) {
+        while (myNode && myNode.firstChild) {
             myNode.removeChild(myNode.firstChild);
         }
         this.activeView.disconnect();
@@ -196,7 +196,7 @@ export class Client extends EventTarget {
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
     }
-
+    
     async start(components, options) {
         if(options) {
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
@@ -273,7 +273,7 @@ export class Client extends EventTarget {
     }
 
     async release(destroyNetworks = false) {
-        console.log("released");
+        console.log("released: " + destroyNetworks);
         this.disconnect();
         clearInterval(this.pollStateIntervalId);
 
@@ -281,7 +281,7 @@ export class Client extends EventTarget {
         {
             // we do not release by default network session, as they are detached by default
             if(destroyNetworks)
-                this.network.relase();
+                await this.network.relase();
             return;
         }
 
@@ -398,16 +398,17 @@ export class Client extends EventTarget {
         this.disconnect();
     }
 
-    stopEnvironment() {
-        if (!this.isStarted)
-            return;
-
+    async stop() {
+        // let activeSession = this.activeView;
+        let results = [];
         this.disconnect();
         for (const session of this.sessions) {
-            session.stop();
+            let result = await session.stop();
+            results.push({id: session.getId(), result: result});
         }
 
         $(this.container).empty();
+        return results;
     }
 
     _establishGuacamoleTunnel(controlUrl) {
