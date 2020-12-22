@@ -286,7 +286,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
         }
 
         // sound support
-        if(sound) {
+        if(false) {
             client.audio_enabled = true;
             clog("sound enabled, audio codec string: "+audio_codec);
             if(audio_codec && audio_codec.indexOf(":")>0) {
@@ -595,6 +595,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
         };
 
         client._sound_start_httpstream = function() {
+            /*
             this.audio = document.createElement("audio");
             this.audio.setAttribute('autoplay', true);
             this.audio.setAttribute('controls', false);
@@ -612,6 +613,7 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
             url += "/audio.mp3?uuid="+this.uuid;
             this.log("starting http stream from", url);
             this.audio.src = url;
+            */
         }
 
         client._new_window = function(wid, x, y, w, h, metadata, override_redirect, client_properties) {
@@ -756,68 +758,4 @@ var loadXpra = function (xpraUrl, xpraPath, xpraConf, eaasClientObj) {
 
     };
 
-
-
-
-    MediaSourceUtil.getMediaSourceAudioCodecs = function(ignore_blacklist) {
-        var media_source_class = MediaSourceUtil.getMediaSourceClass();
-        if(!media_source_class) {
-            Utilities.log("audio forwarding: no media source API support");
-            return [];
-        }
-        //IE is totally useless:
-        if(Utilities.isIE()) {
-            return [];
-        }
-        var codecs_supported = [];
-        for (var codec_option in MediaSourceConstants.CODEC_STRING) {
-            var codec_string = MediaSourceConstants.CODEC_STRING[codec_option];
-            try {
-                // if(!media_source_class.isTypeSupported(codec_string)) {
-                //     Utilities.log("audio codec MediaSource NOK: '"+codec_option+"' / '"+codec_string+"'");
-                //     //add whitelisting here?
-                //     continue;
-                // }
-                var blacklist = ["wav", "wave"];
-                if (Utilities.isFirefox()) {
-                    blacklist += [
-                        // "opus+mka",
-                        // "vorbis+mka",//,
-                        // "aac+mpeg4"
-                        // "mp3+mpeg4"
-                    ];
-                }
-                else if (Utilities.isSafari()) {
-                    //this crashes Safari!
-                    blacklist += [
-                        "aac+mpeg4"
-                        // "opus+mka",
-                        // "vorbis+mka",
-                        // "mp3+mpeg4"
-                    ];
-                }
-
-                else
-                if (Utilities.isChrome()) {
-                    blacklist += ["aac+mpeg4"];
-                }
-                if(blacklist.indexOf(codec_option)>=0) {
-                    Utilities.log("audio codec MediaSource '"+codec_option+"' / '"+codec_string+"' is blacklisted for "+navigator.userAgent);
-                    if(ignore_blacklist) {
-                        Utilities.log("blacklist overruled!");
-                    }
-                    else {
-                        continue;
-                    }
-                }
-                codecs_supported[codec_option] = codec_string;
-                Utilities.log("audio codec MediaSource OK  '"+codec_option+"' / '"+codec_string+"'");
-            }
-            catch (e) {
-                Utilities.error("audio error probing codec '"+codec_string+"' / '"+codec_string+"': "+e);
-            }
-        }
-        Utilities.log("getMediaSourceAudioCodecs(", ignore_blacklist, ")=", codecs_supported);
-        return codecs_supported;
-    }
 };
