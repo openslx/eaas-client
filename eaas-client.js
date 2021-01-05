@@ -18,11 +18,24 @@ function strParamsToObject(str) {
     return result;
 }
 
+/**
+ * Main EaaS Client class 
+ */
 export class Client extends EventTarget {
-    constructor(api_entrypoint, idToken = null) {
+    /**
+     * @constructor
+     * @param {URL} api_entrypoint 
+     * @param {Object} idToken 
+     * @param {Object} kbLayoutPrefs 
+     */
+    constructor(api_entrypoint, idToken = null, kbLayoutPrefs = null) {
         super();
         this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
         this.container;
+        this.kbLayoutPrefs = kbLayoutPrefs ? kbLayoutPrefs : {
+            language: {name: 'us'},
+            layout: {name: 'pc105'} 
+        };
         this.idToken = idToken;
 
         this.deleteOnUnload = true;
@@ -228,6 +241,7 @@ export class Client extends EventTarget {
 
     async createComponent(componentRequest) {
         try {
+            componentRequest.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name)
             let result = await _fetch(`${this.API_URL}/components`, "POST", componentRequest.build(), this.idToken);
             let component = new ComponentSession(this.API_URL, componentRequest.environment, result.id, this.idToken);
             component.setRemovableMediaList(result.removableMediaList);
