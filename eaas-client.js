@@ -211,10 +211,11 @@ export class Client extends EventTarget {
     }
     
     async start(components, options) {
+
         if(options) {
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
         }
-
+        console.log(components);
         try {
             const promisedComponents = components.map(async component => {
                 let componentSession = await this.createComponent(component);
@@ -228,6 +229,7 @@ export class Client extends EventTarget {
             await Promise.all(promisedComponents);
 
             if (options && options.isNetworkEnabled()) {
+                console.log("starting network...");
                 this.network = new NetworkSession(this.API_URL, this.idToken);
                 await this.network.startNetwork(this.sessions, options);
             }
