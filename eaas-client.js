@@ -1,8 +1,8 @@
-import {NetworkSession} from "./lib/networkSession.js"
-import {ComponentSession} from "./lib/componentSession.js"
-import {ClientError, sendEsc, sendCtrlAltDel, sendAltTab, _fetch, requestPointerLock} from "./lib/util.js"
-import {prepareAndLoadXpra} from "./lib/xpraWrapper.js"
-import EventTarget from "./third_party/event-target/esm/index.js"
+import {NetworkSession} from "./lib/networkSession.js";
+import {ComponentSession} from "./lib/componentSession.js";
+import {ClientError, sendEsc, sendCtrlAltDel, sendAltTab, _fetch, requestPointerLock} from "./lib/util.js";
+import {prepareAndLoadXpra} from "./lib/xpraWrapper.js";
+import EventTarget from "./third_party/event-target/esm/index.js";
 
 export {sendEsc, sendCtrlAltDel, sendAltTab, requestPointerLock};
 export {ClientError};
@@ -20,18 +20,21 @@ function strParamsToObject(str) {
 
 /**
  * Main EaaS Client class 
+ *
+ *
+ * @export
+ * @class Client
+ * @extends {EventTarget}
+ * @param {URL} api_entrypoint 
+ * @param {Object} idToken 
+ * @param {Object} kbLayoutPrefs 
  */
 export class Client extends EventTarget {
-    /**
-     * @constructor
-     * @param {URL} api_entrypoint 
-     * @param {Object} idToken 
-     * @param {Object} kbLayoutPrefs 
-     */
+    
     constructor(api_entrypoint, idToken = null, kbLayoutPrefs = null) {
         super();
         this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
-        this.container;
+        this.container = undefined;
         this.kbLayoutPrefs = kbLayoutPrefs ? kbLayoutPrefs : {
             language: {name: 'us'},
             layout: {name: 'pc105'} 
@@ -71,8 +74,16 @@ export class Client extends EventTarget {
                 this.release();
         });
     }
-
-    setXpraConf(width, height, dpi, xpraEncoding) {
+/**
+ *
+ *
+ * @param {*} width
+ * @param {*} height
+ * @param {*} dpi
+ * @param {*} xpraEncoding
+ * @memberof Client
+ */
+setXpraConf(width, height, dpi, xpraEncoding) {
         this.xpraConf = {
             xpraWidth: width,
             xpraHeight: height,
@@ -130,22 +141,38 @@ export class Client extends EventTarget {
             this.onResize(width, height);
         }
     }
-
-    getActiveSession() {
+/**
+ *
+ *
+ * @return {*} 
+ * @memberof Client
+ */
+getActiveSession() {
         return this.activeView;
     }
 
     /* 
         needs to be a global client function, 
         we may checkpoint more then a single machine in the future.
-    */
+    /**
+     *
+     *
+     * @param {*} request
+     * @return {*} 
+     * @memberof Client
+     */
     async checkpoint(request) {
         let session = this.activeView;
         this.disconnect();
         return session.checkpoint(request);
     }
 
-    // Disconnects viewer from a running session
+    /**
+     *
+     *
+     * @return {*} 
+     * @memberof Client
+     */
     disconnect() {
         if (!this.activeView) {
             return;
@@ -171,17 +198,24 @@ export class Client extends EventTarget {
         this.activeView.disconnect();
         this.activeView = undefined;
         this.container = undefined;
-        console.log("Viewer disconnected successfully.")
+        console.log("Viewer disconnected successfully.");
     }
 
-    
+    /**
+     *
+     *
+     * @param {*} sessionId
+     * @param {*} container
+     * @param {*} environmentRequest
+     * @memberof Client
+     */
     async attachNewEnv(sessionId, container, environmentRequest) 
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
         session.sessionId = sessionId;
         this.load(session);
         
-        let componentSession = await this.createComponent(environmentRequest);
+        let componentSession = await this._createComponent(environmentRequest);
         this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
 
         this._connectToNetwork(componentSession, sessionId);
@@ -193,8 +227,15 @@ export class Client extends EventTarget {
 
         await this.connect(container, componentSession);
     }
-
-    async attach(sessionId, container, _componentId)
+/**
+ *
+ *
+ * @param {*} sessionId
+ * @param {*} container
+ * @param {*} _componentId
+ * @memberof Client
+ */
+async attach(sessionId, container, _componentId)
     {
         let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
         session.sessionId = sessionId;
@@ -209,7 +250,13 @@ export class Client extends EventTarget {
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
     }
-    
+    /**
+     *
+     *
+     * @param {*} components
+     * @param {*} options
+     * @memberof Client
+     */
     async start(components, options) {
 
         if(options) {
@@ -218,7 +265,7 @@ export class Client extends EventTarget {
         console.log(components);
         try {
             const promisedComponents = components.map(async component => {
-                let componentSession = await this.createComponent(component);
+                let componentSession = await this._createComponent(component);
                     this.sessions.push(componentSession);
                     if (component.isInteractive() === true) {
                         this.activeView = componentSession;
@@ -241,9 +288,9 @@ export class Client extends EventTarget {
         }
     }
 
-    async createComponent(componentRequest) {
+    async _createComponent(componentRequest) {
         try {
-            componentRequest.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name)
+            componentRequest.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
             let result = await _fetch(`${this.API_URL}/components`, "POST", componentRequest.build(), this.idToken);
             let component = new ComponentSession(this.API_URL, componentRequest.environment, result.id, this.idToken);
             component.setRemovableMediaList(result.removableMediaList);
@@ -256,7 +303,12 @@ export class Client extends EventTarget {
             throw new ClientError("Starting server-side component failed!", error);
         }
     }
-    
+    /**
+     *
+     *
+     * @param {*} session
+     * @memberof Client
+     */
     load(session)
     {
         const sessionId = session.sessionId;
@@ -287,8 +339,14 @@ export class Client extends EventTarget {
             this.idToken);
         return result;
     }
-
-    async release(destroyNetworks = false) {
+/**
+ *
+ *
+ * @param {boolean} [destroyNetworks=false]
+ * @return {*} 
+ * @memberof Client
+ */
+async release(destroyNetworks = false) {
         console.log("released: " + destroyNetworks);
         this.disconnect();
         clearInterval(this.pollStateIntervalId);
@@ -303,7 +361,7 @@ export class Client extends EventTarget {
 
         let url;
         for (const session of this.sessions) {
-            url = await session.stop()
+            url = await session.stop();
             await session.release();
         }
         this.sessions = [];
@@ -316,8 +374,13 @@ export class Client extends EventTarget {
 
         return this.network.getSession(id);
     }
-
-    getSessions() {
+/**
+ *
+ *
+ * @return {*} 
+ * @memberof Client
+ */
+getSessions() {
         if (!this.network) {
             return [];
         }
@@ -338,7 +401,13 @@ export class Client extends EventTarget {
 
     }
 
-    // Connects viewer to a running session
+    /**
+     * 
+     *
+     * @param {*} container
+     * @param {*} view
+     * @memberof Client
+     */
     async connect(container, view) {
         if (!view) {
             console.log("no view defined. using first session");
@@ -395,7 +464,7 @@ export class Client extends EventTarget {
             this.isConnected = true;
 
             if (typeof result.audio !== "undefined")
-                this.initWebRtcAudio(result.audio);
+                this._initWebRtcAudio(result.audio);
 
         }
         catch (e) {
@@ -403,9 +472,15 @@ export class Client extends EventTarget {
             console.log(e);
             this.activeView = undefined;
         }
-    };
-
-    async detach(name, detachTime_minutes) {
+    }
+/**
+ *
+ *
+ * @param {*} name
+ * @param {*} detachTime_minutes
+ * @memberof Client
+ */
+async detach(name, detachTime_minutes) {
         if (!this.network)
             throw new Error("No network session available");
 
@@ -413,8 +488,13 @@ export class Client extends EventTarget {
         window.onbeforeunload = () => { };
         this.disconnect();
     }
-
-    async stop() {
+/**
+ *
+ *
+ * @return {*} 
+ * @memberof Client
+ */
+async stop() {
         // let activeSession = this.activeView;
         let results = [];
         this.disconnect();
@@ -446,7 +526,7 @@ export class Client extends EventTarget {
 
         this.guac.onerror = function(status) {
             console.log("GUAC-ERROR-RESPONSE:", status.code, " -> ", status.message);
-        }
+        };
 
         hideClientCursor(this.guac);
         this.container.insertBefore(displayElement, this.container.firstChild);
@@ -492,8 +572,8 @@ export class Client extends EventTarget {
          */
         var scripts = document.getElementsByTagName("script");
         var eaasClientPath = "";
+        var searchingAim = "eaas-client.js";
         for (var prop in scripts) {
-            var searchingAim = "eaas-client.js";
             if (typeof (scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
                 eaasClientPath = scripts[prop].src;
             }
@@ -506,7 +586,7 @@ export class Client extends EventTarget {
     }
 
     // WebRTC based sound
-    async initWebRtcAudio (url) {
+    async _initWebRtcAudio (url) {
         //const audioStreamElement = document.createElement('audio');
         //audioStreamElement.controls = true;
         //document.documentElement.appendChild(audioStreamElement);
@@ -531,7 +611,7 @@ export class Client extends EventTarget {
 
         const rtcConfig = {
             iceServers: configuredIceServers
-        }
+        };
         console.log("Creating RTC peer connection...");
         this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
 
@@ -640,7 +720,7 @@ export class Client extends EventTarget {
 
         fetch(url).then(onServerMessage);
     }
-};
+}
 /*
  *  Example usage:
  *
@@ -741,7 +821,7 @@ var BwflaMouse = function (client) {
 
         handler = null;
         waiting = false;
-    };
+    }
 
 
     /** Handler for mouse-down events. */
