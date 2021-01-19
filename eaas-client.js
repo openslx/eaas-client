@@ -1,11 +1,33 @@
-import {NetworkSession} from "./lib/networkSession.js";
-import {ComponentSession} from "./lib/componentSession.js";
-import {ClientError, sendEsc, sendCtrlAltDel, sendAltTab, _fetch, requestPointerLock} from "./lib/util.js";
-import {prepareAndLoadXpra} from "./lib/xpraWrapper.js";
+import {
+    NetworkSession
+} from "./lib/networkSession.js";
+import {
+    ComponentSession, 
+    SnapshotRequestBuilder
+} from "./lib/componentSession.js";
+import {
+    ClientError,
+    sendEsc,
+    sendCtrlAltDel,
+    sendAltTab,
+    _fetch,
+    requestPointerLock
+} from "./lib/util.js";
+import {
+    prepareAndLoadXpra
+} from "./lib/xpraWrapper.js";
 import EventTarget from "./third_party/event-target/esm/index.js";
 
-export {sendEsc, sendCtrlAltDel, sendAltTab, requestPointerLock};
-export {ClientError};
+export {
+    sendEsc,
+    sendCtrlAltDel,
+    sendAltTab,
+    requestPointerLock
+};
+export {
+    ClientError,
+    SnapshotRequestBuilder
+};
 
 function strParamsToObject(str) {
     var result = {};
@@ -30,14 +52,18 @@ function strParamsToObject(str) {
  * @param {Object} kbLayoutPrefs 
  */
 export class Client extends EventTarget {
-    
+
     constructor(api_entrypoint, idToken = null, kbLayoutPrefs = null) {
         super();
         this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
         this.container = undefined;
         this.kbLayoutPrefs = kbLayoutPrefs ? kbLayoutPrefs : {
-            language: {name: 'us'},
-            layout: {name: 'pc105'} 
+            language: {
+                name: 'us'
+            },
+            layout: {
+                name: 'pc105'
+            }
         };
         this.idToken = idToken;
 
@@ -74,16 +100,16 @@ export class Client extends EventTarget {
                 this.release();
         });
     }
-/**
- *
- *
- * @param {*} width
- * @param {*} height
- * @param {*} dpi
- * @param {*} xpraEncoding
- * @memberof Client
- */
-setXpraConf(width, height, dpi, xpraEncoding) {
+    /**
+     *
+     *
+     * @param {*} width
+     * @param {*} height
+     * @param {*} dpi
+     * @param {*} xpraEncoding
+     * @memberof Client
+     */
+    setXpraConf(width, height, dpi, xpraEncoding) {
         this.xpraConf = {
             xpraWidth: width,
             xpraHeight: height,
@@ -96,14 +122,13 @@ setXpraConf(width, height, dpi, xpraEncoding) {
     // ... obj && {"content-type" : "application/json" }
     // ...obj && {body: JSON.stringify(obj) },
 
-
     async _pollState() {
         if (this.network) {
             this.network.keepalive();
         }
 
         for (const session of this.sessions) {
-            if(session.getNetwork() && !session.forceKeepalive)
+            if (session.getNetwork() && !session.forceKeepalive)
                 continue;
 
             let result = await session.getEmulatorState();
@@ -115,20 +140,22 @@ setXpraConf(width, height, dpi, xpraEncoding) {
             if (emulatorState == "OK" || emulatorState == "READY")
                 session.keepalive();
             else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
-                if(this.onEmulatorStopped)
+                if (this.onEmulatorStopped)
                     this.onEmulatorStopped();
                 session.keepalive();
-                this.dispatchEvent(new CustomEvent("error", { detail: `${emulatorState}` })); // .addEventListener("error", (e) => {})
-            }
-            else
-                this.dispatchEvent(new CustomEvent("error", { detail: session }));
+                this.dispatchEvent(new CustomEvent("error", {
+                    detail: `${emulatorState}`
+                })); // .addEventListener("error", (e) => {})
+            } else
+                this.dispatchEvent(new CustomEvent("error", {
+                    detail: session
+                }));
         }
     }
 
     _onResize(width, height) {
 
-        if(!this.container)
-        {
+        if (!this.container) {
             console.log("container null: ");
             console.log(this);
             return;
@@ -141,13 +168,13 @@ setXpraConf(width, height, dpi, xpraEncoding) {
             this.onResize(width, height);
         }
     }
-/**
- *
- *
- * @return {*} 
- * @memberof Client
- */
-getActiveSession() {
+    /**
+     *
+     *
+     * @return {*} 
+     * @memberof Client
+     */
+    getActiveSession() {
         return this.activeView;
     }
 
@@ -182,8 +209,7 @@ getActiveSession() {
         if (this.mode === "guac") {
             this.guac.disconnect();
             BWFLA.unregisterEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
-        }
-        else if (this.mode === "xpra") {
+        } else if (this.mode === "xpra") {
             this.xpraClient.close();
         }
 
@@ -209,47 +235,55 @@ getActiveSession() {
      * @param {*} environmentRequest
      * @memberof Client
      */
-    async attachNewEnv(sessionId, container, environmentRequest) 
-    {
-        let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);   
+    async attachNewEnv(sessionId, container, environmentRequest) {
+        let session = await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
         session.sessionId = sessionId;
         this.load(session);
-        
-        let componentSession = await this._createComponent(environmentRequest);
-        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+
+        environmentRequest.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
+        let componentSession = await ComponentSession.createComponent(environmentRequest, this.API_URL, this.idToken);
+        this.pollStateIntervalId = setInterval(() => {
+            this._pollState();
+        }, 1500);
 
         this._connectToNetwork(componentSession, sessionId);
         componentSession.forceKeepalive = true;
 
         this.network.sessionComponents.push(componentSession);
-        this.network.networkConfig.components.push({componentId: componentSession.componentId, networkLabel: "Temp Client"});
+        this.network.networkConfig.components.push({
+            componentId: componentSession.componentId,
+            networkLabel: "Temp Client"
+        });
         this.sessions.push(componentSession);
 
         await this.connect(container, componentSession);
     }
-/**
- *
- *
- * @param {*} sessionId
- * @param {*} container
- * @param {*} _componentId
- * @memberof Client
- */
-async attach(sessionId, container, _componentId)
-    {
-        let session =  await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+
+    /**
+     *
+     *
+     * @param {*} sessionId
+     * @param {*} container
+     * @param {*} _componentId
+     * @memberof Client
+     */
+    async attach(sessionId, container, _componentId) {
+        let session = await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
         session.sessionId = sessionId;
         this.load(session);
 
         let componentSession;
-        if(_componentId) {
+        if (_componentId) {
             componentSession = this.getSession(_componentId);
         }
-        this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+        this.pollStateIntervalId = setInterval(() => {
+            this._pollState();
+        }, 1500);
 
         console.log("attching component:" + componentSession);
         await this.connect(container, componentSession);
     }
+
     /**
      *
      *
@@ -259,20 +293,23 @@ async attach(sessionId, container, _componentId)
      */
     async start(components, options) {
 
-        if(options) {
+        if (options) {
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
         }
         console.log(components);
         try {
             const promisedComponents = components.map(async component => {
-                let componentSession = await this._createComponent(component);
-                    this.sessions.push(componentSession);
-                    if (component.isInteractive() === true) {
-                        this.activeView = componentSession;
-                    }
-                    return componentSession;
+                component.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
+                let componentSession = await ComponentSession.createComponent(component, this.API_URL, this.idToken);
+                this.sessions.push(componentSession);
+                if (component.isInteractive() === true) {
+                    this.activeView = componentSession;
+                }
+                return componentSession;
             });
-            this.pollStateIntervalId = setInterval(() => { this._pollState(); }, 1500);
+            this.pollStateIntervalId = setInterval(() => {
+                this._pollState();
+            }, 1500);
             await Promise.all(promisedComponents);
 
             if (options && options.isNetworkEnabled()) {
@@ -280,49 +317,31 @@ async attach(sessionId, container, _componentId)
                 this.network = new NetworkSession(this.API_URL, this.idToken);
                 await this.network.startNetwork(this.sessions, options);
             }
-        }
-        catch (e) {
+        } catch (e) {
             this.release(true);
             console.log(e);
             throw new ClientError("Starting environment session failed!", e);
         }
     }
 
-    async _createComponent(componentRequest) {
-        try {
-            componentRequest.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
-            let result = await _fetch(`${this.API_URL}/components`, "POST", componentRequest.build(), this.idToken);
-            let component = new ComponentSession(this.API_URL, componentRequest.environment, result.id, this.idToken);
-            component.setRemovableMediaList(result.removableMediaList);
-            component.setSessionRequestInfo(componentRequest);
-            console.log("Environment " + componentRequest.environment + " started.");
-
-           return component;
-        }
-        catch (error) {
-            throw new ClientError("Starting server-side component failed!", error);
-        }
-    }
     /**
      *
      *
      * @param {*} session
      * @memberof Client
      */
-    load(session)
-    {
+    load(session) {
         const sessionId = session.sessionId;
         const sessionComponents = session.components;
         const networkInfo = session.network;
 
-        for(const sc of sessionComponents)
-        {
-            if(sc.type !== "machine")
+        for (const sc of sessionComponents) {
+            if (sc.type !== "machine")
                 continue;
 
             if (this.sessions.filter((sessionComp) => sessionComp.componentId === sc.componentId).length > 0)
                 continue;
-            
+
             let session = new ComponentSession(this.API_URL, sc.environmentId, sc.componentId, this.idToken);
             this.sessions.push(session);
         }
@@ -332,29 +351,27 @@ async attach(sessionId, container, _componentId)
     }
 
     async _connectToNetwork(component, networkID) {
-        const result = await _fetch(`${this.API_URL}/networks/${networkID}/addComponentToSwitch`, "POST", 
-            {
+        const result = await _fetch(`${this.API_URL}/networks/${networkID}/addComponentToSwitch`, "POST", {
                 componentId: component.getId(),
             },
             this.idToken);
         return result;
     }
-/**
- *
- *
- * @param {boolean} [destroyNetworks=false]
- * @return {*} 
- * @memberof Client
- */
-async release(destroyNetworks = false) {
+    /**
+     *
+     *
+     * @param {boolean} [destroyNetworks=false]
+     * @return {*} 
+     * @memberof Client
+     */
+    async release(destroyNetworks = false) {
         console.log("released: " + destroyNetworks);
         this.disconnect();
         clearInterval(this.pollStateIntervalId);
 
-        if (this.network)
-        {
+        if (this.network) {
             // we do not release by default network session, as they are detached by default
-            if(destroyNetworks)
+            if (destroyNetworks)
                 await this.network.relase();
             return;
         }
@@ -374,13 +391,13 @@ async release(destroyNetworks = false) {
 
         return this.network.getSession(id);
     }
-/**
- *
- *
- * @return {*} 
- * @memberof Client
- */
-getSessions() {
+    /**
+     *
+     *
+     * @return {*} 
+     * @memberof Client
+     */
+    getSessions() {
         if (!this.network) {
             return [];
         }
@@ -388,15 +405,14 @@ getSessions() {
         const sessionInfo = [];
         let networkSessions = this.network.getSessions();
 
-        for(let session of networkSessions)
-        {
+        for (let session of networkSessions) {
             const conf = this.network.getNetworkConfig(session.componentId);
             sessionInfo.push({
                 id: conf.componentId,
                 title: conf.networkLabel
             });
         }
-        
+
         return sessionInfo;
 
     }
@@ -411,15 +427,15 @@ getSessions() {
     async connect(container, view) {
         if (!view) {
             console.log("no view defined. using first session");
-            view = this.sessions[0];    
+            view = this.sessions[0];
         }
 
         if (this.activeView)
             this.disconnect();
 
         if (!view)
-            throw new Error("no active view possible");           
-        
+            throw new Error("no active view possible");
+
         this.activeView = view;
 
         this.container = container;
@@ -454,8 +470,7 @@ getSessions() {
                 controlUrl = encodeURIComponent(JSON.stringify(result));
                 this.params = strParamsToObject(result.webemulator.substring(result.webemulator.indexOf("#") + 1));
                 connectViewerFunc = this._prepareAndLoadWebEmulator;
-            }
-            else {
+            } else {
                 throw Error("Unsupported connector type: " + result);
             }
             // Establish the connection
@@ -466,41 +481,43 @@ getSessions() {
             if (typeof result.audio !== "undefined")
                 this._initWebRtcAudio(result.audio);
 
-        }
-        catch (e) {
+        } catch (e) {
             console.error("Connecting viewer failed!");
             console.log(e);
             this.activeView = undefined;
         }
     }
-/**
- *
- *
- * @param {*} name
- * @param {*} detachTime_minutes
- * @memberof Client
- */
-async detach(name, detachTime_minutes) {
+    /**
+     *
+     *
+     * @param {*} name
+     * @param {*} detachTime_minutes
+     * @memberof Client
+     */
+    async detach(name, detachTime_minutes) {
         if (!this.network)
             throw new Error("No network session available");
 
         await this.network.detach(name, detachTime_minutes);
-        window.onbeforeunload = () => { };
+        window.onbeforeunload = () => {};
         this.disconnect();
     }
-/**
- *
- *
- * @return {*} 
- * @memberof Client
- */
-async stop() {
+    /**
+     *
+     *
+     * @return {*} 
+     * @memberof Client
+     */
+    async stop() {
         // let activeSession = this.activeView;
         let results = [];
         this.disconnect();
         for (const session of this.sessions) {
             let result = await session.stop();
-            results.push({id: session.getId(), result: result});
+            results.push({
+                id: session.getId(),
+                result: result
+            });
         }
 
         $(this.container).empty();
@@ -509,7 +526,8 @@ async stop() {
 
     _establishGuacamoleTunnel(controlUrl) {
         $.fn.focusWithoutScrolling = function () {
-            var x = window.scrollX, y = window.scrollY;
+            var x = window.scrollX,
+                y = window.scrollY;
             this.focus();
             window.scrollTo(x, y);
             return this;
@@ -524,7 +542,7 @@ async stop() {
         this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
         var displayElement = this.guac.getDisplay().getElement();
 
-        this.guac.onerror = function(status) {
+        this.guac.onerror = function (status) {
             console.log("GUAC-ERROR-RESPONSE:", status.code, " -> ", status.message);
         };
 
@@ -586,27 +604,30 @@ async stop() {
     }
 
     // WebRTC based sound
-    async _initWebRtcAudio (url) {
+    async _initWebRtcAudio(url) {
         //const audioStreamElement = document.createElement('audio');
         //audioStreamElement.controls = true;
         //document.documentElement.appendChild(audioStreamElement);
 
-        await fetch(url + '?connect', { method: 'POST' });
+        await fetch(url + '?connect', {
+            method: 'POST'
+        });
 
         let _url = new URL(url);
         console.log("using host: " + _url.hostname + " for audio connection");
         const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
         const audioctx = new AudioContext();
 
-        let configuredIceServers = [
-                { urls: 'stun:stun.l.google.com:19302'},
-        ];
+        let configuredIceServers = [{
+            urls: 'stun:stun.l.google.com:19302'
+        }, ];
 
-        if(_url.hostname !== "localhost") {
-            configuredIceServers.push(
-                {   urls: "turn:" + _url.hostname,
-                    username: "eaas",
-                    credential: "eaas"});
+        if (_url.hostname !== "localhost") {
+            configuredIceServers.push({
+                urls: "turn:" + _url.hostname,
+                username: "eaas",
+                credential: "eaas"
+            });
         }
 
         const rtcConfig = {
@@ -709,8 +730,7 @@ async stop() {
                             console.error("Unsupported message type: " + message.type);
                     }
                 }
-            }
-            catch (error) {
+            } catch (error) {
                 console.log(error);
             }
 
@@ -763,7 +783,7 @@ BWFLA.registerEventCallback = function (target, eventName, callback) {
     // If required, initialize handler management function
     if (target[event] == null) {
         target[event] = function () {
-            var params = arguments;  // Parameters to the original callback
+            var params = arguments; // Parameters to the original callback
 
             // Call all registered callbacks one by one
             callbacks.forEach(function (func) {
