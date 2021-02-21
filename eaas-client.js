@@ -79,6 +79,7 @@ export class Client extends EventTarget {
          * component session attached to browser canvas
          */
         this.activeView = null;
+        this.defaultView = null;
 
         this.envsComponentsData = [];
 
@@ -303,7 +304,7 @@ export class Client extends EventTarget {
                 let componentSession = await ComponentSession.createComponent(component, this.API_URL, this.idToken);
                 this.sessions.push(componentSession);
                 if (component.isInteractive() === true) {
-                    this.activeView = componentSession;
+                    this.defaultView = componentSession;
                 }
                 return componentSession;
             });
@@ -426,8 +427,15 @@ export class Client extends EventTarget {
      */
     async connect(container, view) {
         if (!view) {
-            console.log("no view defined. using first session");
-            view = this.sessions[0];
+            if(this.defaultView)
+            {
+                view = this.defaultView;
+            }
+            else
+            {
+                console.log("no view defined. using first session");
+                view = this.sessions[0];
+            }
         }
 
         if (this.activeView)
