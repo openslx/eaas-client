@@ -52,8 +52,8 @@ function strParamsToObject(str) {
  * @param {Object} kbLayoutPrefs 
  */
 export class Client extends EventTarget {
-
-    constructor(api_entrypoint, idToken = null, kbLayoutPrefs = null) {
+    constructor(api_entrypoint, idToken = null,
+        {kbLayoutPrefs, emulatorContainer = document.getElementById("emulator-container")} = {}) {
         super();
         this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
         this.container = undefined;
@@ -91,6 +91,7 @@ export class Client extends EventTarget {
             xpraDPI: 96,
             xpraEncoding: "jpeg"
         };
+        this.emulatorContainer = emulatorContainer;
 
         // ID for registered this.pollState() with setInterval()
         this.pollStateIntervalId = null;
@@ -217,7 +218,7 @@ export class Client extends EventTarget {
         if (this.rtcPeerConnection != null)
             this.rtcPeerConnection.close();
 
-        let myNode = document.getElementById("emulator-container");
+        let myNode = this.emulatorContainer;
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
         while (myNode && myNode.firstChild) {
             myNode.removeChild(myNode.firstChild);
