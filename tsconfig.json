@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "allowJs": true,
+        "target": "ESNext",
+        "outDir": "build/"
+    },
+    "include": [
+        "*.js",
+        "lib/**/*.js"
+    ],
+    "typedocOptions": {
+        "out": "./docs"
+    }
+}
