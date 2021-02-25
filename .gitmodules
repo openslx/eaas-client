@@ -1,3 +1,9 @@
 [submodule "xpra-html5"]
 	path = xpra-html5
 	url = https://github.com/Xpra-org/xpra-html5
+[submodule "guacamole/guacamole-client"]
+	path = guacamole/guacamole-client
+	url = https://github.com/apache/guacamole-client
+[submodule "guacamole/guacamole-client-css"]
+	path = guacamole/guacamole-client-css
+	url = https://github.com/apache/guacamole-client
