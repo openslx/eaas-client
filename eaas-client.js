@@ -16,6 +16,10 @@ import {
 import {
     prepareAndLoadXpra
 } from "./lib/xpraWrapper.js";
+import {
+    importGuacamole
+} from "./lib/guacamoleWrapper.js"
+
 import EventTarget from "./third_party/event-target/esm/index.js";
 
 export {
@@ -533,7 +537,8 @@ export class Client extends EventTarget {
         return results;
     }
 
-    _establishGuacamoleTunnel(controlUrl) {
+    async _establishGuacamoleTunnel(controlUrl) {
+        await importGuacamole();
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX,
                 y = window.scrollY;
