@@ -105,10 +105,10 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} width
-     * @param {*} height
-     * @param {*} dpi
-     * @param {*} xpraEncoding
+     * @param width
+     * @param height
+     * @param dpi
+     * @param xpraEncoding
      * @memberof Client
      */
     setXpraConf(width, height, dpi, xpraEncoding) {
@@ -173,7 +173,7 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @return {*} 
+     * @return
      * @memberof Client
      */
     getActiveSession() {
@@ -186,8 +186,8 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} request
-     * @return {*} 
+     * @param request
+     * @return
      * @memberof Client
      */
     async checkpoint(request) {
@@ -199,7 +199,7 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @return {*} 
+     * @return
      * @memberof Client
      */
     disconnect() {
@@ -232,9 +232,9 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} sessionId
-     * @param {*} container
-     * @param {*} environmentRequest
+     * @param sessionId
+     * @param container
+     * @param environmentRequest
      * @memberof Client
      */
     async attachNewEnv(sessionId, container, environmentRequest) {
@@ -264,9 +264,9 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} sessionId
-     * @param {*} container
-     * @param {*} _componentId
+     * @param sessionId
+     * @param container
+     * @param _componentId
      * @memberof Client
      */
     async attach(sessionId, container, _componentId) {
@@ -289,8 +289,8 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} components
-     * @param {*} options
+     * @param components
+     * @param options
      * @memberof Client
      */
     async start(components, options) {
@@ -329,7 +329,7 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} session
+     * @param session
      * @memberof Client
      */
     load(session) {
@@ -363,7 +363,7 @@ export class Client extends EventTarget {
      *
      *
      * @param {boolean} [destroyNetworks=false]
-     * @return {*} 
+     * @return
      * @memberof Client
      */
     async release(destroyNetworks = false) {
@@ -396,7 +396,7 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @return {*} 
+     * @return
      * @memberof Client
      */
     getSessions() {
@@ -422,8 +422,8 @@ export class Client extends EventTarget {
     /**
      * 
      *
-     * @param {*} container
-     * @param {*} view
+     * @param container
+     * @param view
      * @memberof Client
      */
     async connect(container, view) {
@@ -499,8 +499,8 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @param {*} name
-     * @param {*} detachTime_minutes
+     * @param name
+     * @param detachTime_minutes
      * @memberof Client
      */
     async detach(name, detachTime_minutes) {
@@ -514,7 +514,7 @@ export class Client extends EventTarget {
     /**
      *
      *
-     * @return {*} 
+     * @return
      * @memberof Client
      */
     async stop() {
