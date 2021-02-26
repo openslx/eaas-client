@@ -453,6 +453,19 @@ export class Client extends EventTarget {
             let connectViewerFunc, controlUrl;
             let viewerData;
 
+            // DEBUG: Wait for host/DNS propagation
+            const hostUp = (url) => fetch(url, {mode: "no-cors"}).then(() => true, () => false);
+            const timeout = (time_ms) => new Promise((r) => setTimeout(r, time_ms));
+            const rrCloudflare = async (name) => (await (await
+                fetch(`https://cloudflare-dns.com/dns-query?${new URLSearchParams({type: "A", name})}`,
+                {headers: {accept: "application/dns-json"}})).text());
+            const hostURL = new URL("/", result.guacamole || result.xpra);
+            while (!await hostUp(hostURL)) {
+                console.debug("Host not reachable:", hostURL);
+                console.debug("Cloudflare says:", await rrCloudflare(hostURL).catch(console.debug));
+                await timeout(1000);
+            }
+
             // Get the first ws+ethernet connector
             const entries = Object.entries(result).filter(([k]) => k.match(/^ws\+ethernet\+/));
             if (entries.length)
