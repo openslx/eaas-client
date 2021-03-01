@@ -1,0 +1,9 @@
+[submodule "xpra/xpra-html5"]
+	path = xpra/xpra-html5
+	url = https://github.com/Xpra-org/xpra-html5
+[submodule "guacamole/guacamole-client-eaas"]
+	path = guacamole/guacamole-client-eaas
+	url = https://gitlab.com/emulation-as-a-service/guacamole-client-eaas/
+[submodule "third_party/event-target"]
+	path = third_party/event-target
+	url = https://github.com/ungap/event-target
