@@ -1,4 +1,4 @@
-const xpraJsPath = "../xpra-html5/html5/js/";
+const xpraJsPath = "./xpra-html5/html5/js/";
 
 importScripts = new Proxy(importScripts, {
     apply(target, thisArgument, argumentsList) {

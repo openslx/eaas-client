@@ -1,5 +1,5 @@
-import { loadScript, loadStyleSheet, once } from "./util.js";
-import { jsFiles, cssFiles } from "../guacamole/file-list.js";
+import { loadScript, loadStyleSheet, once } from "../lib/util.js";
+import { jsFiles, cssFiles } from "./file-list.js";
 
 // HACK: import.meta.url does not work with webpack
 // const baseUrl = new URL("..", import.meta.url);

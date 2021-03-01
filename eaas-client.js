@@ -15,10 +15,10 @@ import {
 } from "./lib/util.js";
 import {
     prepareAndLoadXpra
-} from "./lib/xpraWrapper.js";
+} from "./xpra/xpraWrapper.js";
 import {
     importGuacamole
-} from "./lib/guacamoleWrapper.js"
+} from "./guacamole/guacamoleWrapper.js"
 
 import EventTarget from "./third_party/event-target/esm/index.js";
 

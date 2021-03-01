@@ -1,5 +1,5 @@
-[submodule "xpra-html5"]
-	path = xpra-html5
+[submodule "xpra/xpra-html5"]
+	path = xpra/xpra-html5
 	url = https://github.com/Xpra-org/xpra-html5
 [submodule "guacamole/guacamole-client-eaas"]
 	path = guacamole/guacamole-client-eaas

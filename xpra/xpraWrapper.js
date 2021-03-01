@@ -1,5 +1,5 @@
 import { baseUrl } from "../base-url.js";
-import { once, loadScript, loadStyleSheet } from "./util.js";
+import { once, loadScript, loadStyleSheet } from "../lib/util.js";
 
 // HACK: import.meta.url does not work with webpack
 // const baseUrl = new URL("..", import.meta.url);
@@ -31,7 +31,7 @@ const WorkerCORS = new Proxy(Worker, {
   },
 });
 
-const xpraPath = new URL("xpra-html5/html5/", baseUrl);
+const xpraPath = new URL("xpra/xpra-html5/html5/", baseUrl);
 
 const WorkerCORS2 = new Proxy(WorkerCORS, {
   construct(target, argArray, newTarget) {
@@ -41,7 +41,7 @@ const WorkerCORS2 = new Proxy(WorkerCORS, {
         argArray[0] = String(new URL("js/lib/wsworker_check.js", xpraPath));
         break;
       case "js/Protocol.js":
-        argArray[0] = String(new URL("lib/eaas-xpra-worker.js", baseUrl));
+        argArray[0] = String(new URL("xpra/eaas-xpra-worker.js", baseUrl));
         break;
     }
     return Reflect.construct(target, argArray, newTarget);
@@ -69,7 +69,7 @@ const importXpra = once(async () => {
     loadScript(new URL("./js/lib/FileSaver.js", xpraPath)),
     loadScript(new URL("./js/lib/jszip.js", xpraPath)),
     loadScript(new URL("./js/lib/pyrencoder.js", xpraPath)),
-    loadScript(new URL("./lib/eaas-xpra.js", baseUrl)),
+    loadScript(new URL("./xpra/eaas-xpra.js", baseUrl)),
     loadScript(new URL("./js/Keycodes.js", xpraPath)),
     loadScript(new URL("./js/Utilities.js", xpraPath)),
     loadScript(new URL("./js/Notifications.js", xpraPath)),
