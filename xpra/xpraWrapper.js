@@ -50,6 +50,8 @@ const WorkerCORS2 = new Proxy(WorkerCORS, {
 
 const importXpra = once(async () => {
   Worker = WorkerCORS2;
+  if (!globalThis.jQuery)
+    await loadScript(new URL("./js/lib/jquery.js", xpraPath));
   await Promise.all([
     loadScript(new URL("./js/lib/AudioContextMonkeyPatch.js", xpraPath)),
     loadScript(new URL("./js/lib/zlib.js", xpraPath)),
