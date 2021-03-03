@@ -1,0 +1,28 @@
+<!doctype html>
+<script src="webcomponent.js" type="module"></script>
+
+<p>Some introductory text ...</p>
+<hr>
+
+<eaas-environment id="env"
+  eaas-service="https://eaas-test.emulation.cloud/emil/"
+  environment-id="8bcd6656-f0ca-4f5c-a26f-8bdbdf5d8951"
+  image-archive="default"
+>
+Please wait ...
+</eaas-environment>
+
+<hr>
+<p>... more text.</p>
+
+<style>
+eaas-environment {
+  border: red solid 5px;
+}
+</style>
+
+<script type="module">
+env.addEventListener("ready", () => {
+  document.body.style.background = "green";
+});
+</script>
