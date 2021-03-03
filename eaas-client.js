@@ -14,6 +14,7 @@ import {
     requestPointerLock
 } from "./lib/util.js";
 import {
+    loadJQuery,
     prepareAndLoadXpra
 } from "./xpra/xpraWrapper.js";
 import {
@@ -539,6 +540,8 @@ export class Client extends EventTarget {
 
     async _establishGuacamoleTunnel(controlUrl) {
         await importGuacamole();
+        // TODO: Remove direct jQuery dependencies from eaas-client
+        await loadJQuery();
         $.fn.focusWithoutScrolling = function () {
             var x = window.scrollX,
                 y = window.scrollY;
