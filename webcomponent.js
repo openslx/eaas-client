@@ -4,7 +4,7 @@ import {
   InputContentBuilder,
   MachineComponentBuilder,
 } from "./lib/componentBuilder.js";
-import { ClientOptions } from "./lib/clientOptions.js";
+import { ClientOptions, NetworkConfig } from "./lib/clientOptions.js";
 import { NetworkBuilder } from "./lib/networkBuilder.js";
 import { _fetch } from "./lib/util.js";
 
@@ -33,6 +33,7 @@ class EaasClientElement extends HTMLElement {
 
     const envId = this.getAttribute("environment-id");
     const imageArchive = this.getAttribute("image-archive") || "public";
+    const enableInternet = this.hasAttribute("enable-internet");
     const networkId = this.getAttribute("network-id");
     const networkLabel = this.getAttribute("network-label");
     const containerId = this.getAttribute("src")?.match(/\/?([^/]+)$/)[1];
@@ -81,8 +82,18 @@ class EaasClientElement extends HTMLElement {
       }
     };
 
-    const clientOptions = new ClientOptions();
+    let clientOptions = new ClientOptions();
+    let components = [machine];
     (async () => {
+      if (enableInternet) {
+        const networkBuilder = new NetworkBuilder(this.backendUrl);
+        networkBuilder.addComponent(machine);
+        components = await networkBuilder.getComponents();
+        clientOptions = await networkBuilder.getDefaultClientOptions();
+        clientOptions.getNetworkConfig().enableInternet(true);
+        clientOptions.getNetworkConfig().enableSlirpDhcp(true);
+      }
+
       if (networkId) {
         const netUtils = new NetworkBuilder(backendUrl);
         const session = await netUtils.connectNetworkSession(
@@ -105,7 +116,13 @@ class EaasClientElement extends HTMLElement {
         this.session = componentSession;
         monitorStateChanges();
       } else {
-        await client.start([machine], clientOptions);
+        await client.start(components, clientOptions);
+        if (enableInternet) {
+          this.session = await client.getSession(
+            (await client.getSessions())[0].id
+          );
+          monitorStateChanges();
+        }
       }
       await client.connect(container);
       for (const el of [...this.childNodes])
