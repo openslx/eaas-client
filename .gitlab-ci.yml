@@ -1,0 +1,23 @@
+image: busybox
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+build:
+  script:
+    - ":"
+  artifacts:
+    paths:
+      - "*"
+
+pages:
+  script:
+    - mkdir -p public
+    # HACK: Delete broken symlinks
+    - find -L -type l -delete
+    - "mv * public/ || :"
+  artifacts:
+    paths:
+      - "*"
+  only:
+    - pages
