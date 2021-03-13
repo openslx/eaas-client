@@ -46,6 +46,17 @@ class EaasClientElement extends HTMLElement {
         userContainerArchive: imageArchive,
       });
 
+    const userMedia = [...this.querySelectorAll("eaas-medium")];
+    if(userMedia.length)
+    {
+      for (const medium of userMedia) {
+        const url = medium.getAttribute("source-url");
+        const type = medium.getAttribute("type");
+
+        machine.addUserMedia(url, type);
+      }
+    }
+
     let inputMedia;
     const inputs = [...this.querySelectorAll("eaas-input")];
     if (inputs.length) {
