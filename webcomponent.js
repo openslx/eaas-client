@@ -49,12 +49,13 @@ class EaasClientElement extends HTMLElement {
     this.client.onEmulatorStopped = async () => {
       let result = await this.client.release();
       console.log(result);
-      for (const download of this.querySelectorAll("eaas-result")) {
+      for (const download of downloads) {
         const a = document.createElement("a");
         a.href = result.url;
         a.append(...download.childNodes);
         download.append(a);
         download.hidden = false;
+        this.append(download);
       }
     };
 
@@ -69,7 +70,8 @@ class EaasClientElement extends HTMLElement {
       }
     }
 
-    for (const download of this.querySelectorAll("eaas-result")) {
+    const downloads = [...this.querySelectorAll("eaas-result")];
+    for (const download of downloads) {
       download.hidden = true;
     }
 
