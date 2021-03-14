@@ -49,6 +49,10 @@ class EaasClientElement extends HTMLElement {
     this.client.onEmulatorStopped = async () => {
       let result = await this.client.release();
       console.log(result);
+      for (const download of this.querySelectorAll("eaas-result")) {
+        download.hidden = false;
+        download.href = result.url;
+      }
     };
 
     const userMedia = [...this.querySelectorAll("eaas-medium")];
@@ -60,6 +64,10 @@ class EaasClientElement extends HTMLElement {
 
         machine.addUserMedia(url, type);
       }
+    }
+
+    for (const download of this.querySelectorAll("eaas-result")) {
+      download.hidden = true;
     }
 
     let inputMedia;
