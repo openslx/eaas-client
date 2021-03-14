@@ -45,6 +45,10 @@ class EaasClientElement extends HTMLElement {
         userContainerEnvironment: containerId,
         userContainerArchive: imageArchive,
       });
+    
+    this.client.onEmulatorStopped = () => {
+      console.log(this.client.release());
+    };
 
     const userMedia = [...this.querySelectorAll("eaas-medium")];
     if(userMedia.length)
