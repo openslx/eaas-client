@@ -47,7 +47,8 @@ class EaasClientElement extends HTMLElement {
       });
     
     this.client.onEmulatorStopped = async () => {
-      console.log(await this.client.release());
+      let result = await this.client.release();
+      console.log(result);
     };
 
     const userMedia = [...this.querySelectorAll("eaas-medium")];
