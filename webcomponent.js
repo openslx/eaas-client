@@ -52,7 +52,7 @@ class EaasClientElement extends HTMLElement {
       for (const download of this.querySelectorAll("eaas-result")) {
         const a = document.createElement("a");
         a.href = result.url;
-        a.append(...downlad.childNodes);
+        a.append(...download.childNodes);
         download.append(a);
         download.hidden = false;
       }
