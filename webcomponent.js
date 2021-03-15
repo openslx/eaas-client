@@ -41,6 +41,9 @@ class EaasClientElement extends HTMLElement {
     if(containerId && !envId)
       envId = this.getAttribute("container-runtime-id");
 
+    console.log(containerId);
+    console.log(envId);
+
     const networkName =
       this.getAttribute("network-name") ?? `network-${Math.random()}`;
     const machine = new MachineComponentBuilder(envId, imageArchive);
