@@ -31,12 +31,16 @@ class EaasClientElement extends HTMLElement {
     this.style.display = "block";
     this.style.width = "min-content";
 
-    const envId = this.getAttribute("environment-id");
+    let envId = this.getAttribute("environment-id");
     const imageArchive = this.getAttribute("image-archive") || "public";
     const enableInternet = this.hasAttribute("enable-internet");
     const networkId = this.getAttribute("network-id");
     const networkLabel = this.getAttribute("network-label");
-    const containerId = this.getAttribute("src")?.match(/\/?([^/]+)$/)[1];
+    const containerId = this.getAttribute("container-id")?.match(/\/?([^/]+)$/)[1];
+
+    if(containerId && !envId)
+      envId = this.getAttribute("container-runtime-id");
+
     const networkName =
       this.getAttribute("network-name") ?? `network-${Math.random()}`;
     const machine = new MachineComponentBuilder(envId, imageArchive);
