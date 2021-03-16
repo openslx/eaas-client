@@ -78,7 +78,7 @@ class EaasClientElement extends HTMLElement {
         if(url && type)
           machine.addUserMedia(url, type);
         else if(objectId)
-          machine.setObject(objectId);
+          machine.setObject(objectId, "zero conf");
       }
     }
 
