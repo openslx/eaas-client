@@ -135,7 +135,8 @@ class EaasClientElement extends HTMLElement {
           clientOptions.getNetworkConfig().enableSlirpDhcp(true);
         }
         else {
-          networkBuilder.getNetworkConfig().archived_internet_date = internetDate; // todo: verify data-fmt
+          console.log(internetDate);
+          networkBuilder.getNetworkConfig().archived_internet_date = internetDate;
           await networkBuilder.enableDhcpService(networkBuilder.getNetworkConfig());
         }
        
