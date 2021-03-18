@@ -136,7 +136,7 @@ class EaasClientElement extends HTMLElement {
         else {
           
           let config = networkBuilder.getNetworkConfig().archived_internet_date = "2010-01-01T00:00:00";
-          networkBuilder.enableDhcpService(config);
+          await networkBuilder.enableDhcpService(config);
         }
        
         components = await networkBuilder.getComponents();
