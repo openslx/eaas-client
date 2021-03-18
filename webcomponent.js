@@ -34,7 +34,7 @@ class EaasClientElement extends HTMLElement {
     let envId = this.getAttribute("environment-id");
     const imageArchive = this.getAttribute("image-archive") || "public";
     const enableInternet = this.hasAttribute("enable-internet");
-    const internetDate = this.hasAttribute("internet-date");
+    const internetDate = this.getAttribute("internet-date");
     const networkId = this.getAttribute("network-id");
     const networkLabel = this.getAttribute("network-label");
     const containerId = this.getAttribute("container-id")?.match(/\/?([^/]+)$/)[1];
