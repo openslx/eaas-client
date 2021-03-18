@@ -34,15 +34,13 @@ class EaasClientElement extends HTMLElement {
     let envId = this.getAttribute("environment-id");
     const imageArchive = this.getAttribute("image-archive") || "public";
     const enableInternet = this.hasAttribute("enable-internet");
+    const internetDate = this.hasAttribute("internet-date");
     const networkId = this.getAttribute("network-id");
     const networkLabel = this.getAttribute("network-label");
     const containerId = this.getAttribute("container-id")?.match(/\/?([^/]+)$/)[1];
 
     if(containerId && !envId)
       envId = this.getAttribute("container-runtime-id");
-
-    console.log(containerId);
-    console.log(envId);
 
     const networkName =
       this.getAttribute("network-name") ?? `network-${Math.random()}`;
@@ -129,10 +127,19 @@ class EaasClientElement extends HTMLElement {
       if (enableInternet) {
         const networkBuilder = new NetworkBuilder(this.backendUrl);
         networkBuilder.addComponent(machine);
-        components = await networkBuilder.getComponents();
         clientOptions = await networkBuilder.getDefaultClientOptions();
         clientOptions.getNetworkConfig().enableInternet(true);
-        clientOptions.getNetworkConfig().enableSlirpDhcp(true);
+        if(!internetDate)  
+        {
+          clientOptions.getNetworkConfig().enableSlirpDhcp(true);
+        }
+        else {
+          
+          let config = networkBuilder.getNetworkConfig().archived_internet_date = "2010-01-01T00:00:00";
+          networkBuilder.enableDhcpService(config);
+        }
+       
+        components = await networkBuilder.getComponents();
       }
 
       if (networkId) {
