@@ -45,6 +45,7 @@ class EaasClientElement extends HTMLElement {
     const networkName =
       this.getAttribute("network-name") ?? `network-${Math.random()}`;
     const machine = new MachineComponentBuilder(envId, imageArchive);
+    machine.setInteractive(true);
     if (containerId)
       machine.setLinuxRuntime({
         userContainerEnvironment: containerId,
