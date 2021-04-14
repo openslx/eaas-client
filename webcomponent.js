@@ -20,6 +20,9 @@ const kbLayoutPrefs = {
 class EaasClientElement extends HTMLElement {
   constructor() {
     super();
+    if (this.hasAttribute("autoplay")) this.play();
+  }
+  async play() {
     const container = document.createElement("div");
     container.id = "emulator-container";
     this.append(container);
@@ -95,50 +98,48 @@ class EaasClientElement extends HTMLElement {
 
     let clientOptions = new ClientOptions();
     let components = [machine];
-    (async () => {
+    if (enableInternet) {
+      const networkBuilder = new NetworkBuilder(this.backendUrl);
+      networkBuilder.addComponent(machine);
+      components = await networkBuilder.getComponents();
+      clientOptions = await networkBuilder.getDefaultClientOptions();
+      clientOptions.getNetworkConfig().enableInternet(true);
+      clientOptions.getNetworkConfig().enableSlirpDhcp(true);
+    }
+
+    if (networkId) {
+      const netUtils = new NetworkBuilder(backendUrl);
+      const session = await netUtils.connectNetworkSession(
+        client,
+        networkId,
+        networkName
+      );
+
+      const realSession = await _fetch(
+        `${client.API_URL}/sessions/${session.id}`,
+        "GET"
+      );
+      client.load(realSession);
+
+      const { componentId } = client.network.networkConfig.components.find(
+        (e) => e.networkLabel === networkLabel
+      );
+
+      const componentSession = client.getSession(componentId);
+      this.session = componentSession;
+      monitorStateChanges();
+    } else {
+      await client.start(components, clientOptions);
       if (enableInternet) {
-        const networkBuilder = new NetworkBuilder(this.backendUrl);
-        networkBuilder.addComponent(machine);
-        components = await networkBuilder.getComponents();
-        clientOptions = await networkBuilder.getDefaultClientOptions();
-        clientOptions.getNetworkConfig().enableInternet(true);
-        clientOptions.getNetworkConfig().enableSlirpDhcp(true);
-      }
-
-      if (networkId) {
-        const netUtils = new NetworkBuilder(backendUrl);
-        const session = await netUtils.connectNetworkSession(
-          client,
-          networkId,
-          networkName
+        this.session = await client.getSession(
+          (await client.getSessions())[0].id
         );
-
-        const realSession = await _fetch(
-          `${client.API_URL}/sessions/${session.id}`,
-          "GET"
-        );
-        client.load(realSession);
-
-        const { componentId } = client.network.networkConfig.components.find(
-          (e) => e.networkLabel === networkLabel
-        );
-
-        const componentSession = client.getSession(componentId);
-        this.session = componentSession;
         monitorStateChanges();
-      } else {
-        await client.start(components, clientOptions);
-        if (enableInternet) {
-          this.session = await client.getSession(
-            (await client.getSessions())[0].id
-          );
-          monitorStateChanges();
-        }
       }
-      await client.connect(container);
-      for (const el of [...this.childNodes])
-        if (el !== this.container) el.remove();
-    })();
+    }
+    await client.connect(container);
+    for (const el of [...this.childNodes])
+      if (el !== this.container) el.remove();
   }
   attributeChangedCallback() {}
 }
