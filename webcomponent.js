@@ -41,6 +41,7 @@ class EaasClientElement extends HTMLElement {
     const networkId = this.getAttribute("network-id");
     const networkLabel = this.getAttribute("network-label");
     const containerId = this.getAttribute("container-id")?.match(/\/?([^/]+)$/)[1];
+    const xpraEncoding = this.getAttribute("xpra-encoding");
 
     if(containerId && !envId)
       envId = this.getAttribute("container-runtime-id");
@@ -126,6 +127,7 @@ class EaasClientElement extends HTMLElement {
     };
 
     let clientOptions = new ClientOptions();
+    if (xpraEncoding) clientOptions.setXpraEncoding(xpraEncoding);
     let components = [machine];
 
     if (enableInternet) {
