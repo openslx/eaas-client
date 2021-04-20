@@ -81,6 +81,8 @@ globalThis.loadXpra = (
   client.div = "emulator-container";
 
   const container = document.getElementById(client.div);
+  // HACK: Fix offset due to missing window border
+  container.style.translate = "10px -20px";
   const windowsList = Object.assign(document.createElement("div"), {
     id: "open_windows_list",
     hidden: true,
