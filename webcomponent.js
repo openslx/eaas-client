@@ -17,14 +17,41 @@ const kbLayoutPrefs = {
   },
 };
 
+const containerName = "emulator-container";
+
 class EaasClientElement extends HTMLElement {
   constructor() {
     super();
     if (this.hasAttribute("autoplay")) this.play();
   }
+
+  async pressKey(key, keyCode = key.toUpperCase().charCodeAt(0), {altKey, ctrlKey, metaKey, timeout = 100} = {})
+  {
+      const el = document.getElementById(containerName).firstElementChild;
+      if (ctrlKey) {
+          el.dispatchEvent(new KeyboardEvent("keydown", {key: "Control", keyCode: 17, bubbles: true}));
+          await new Promise(r => setTimeout(r, timeout));
+      }
+      if (altKey) {
+          el.dispatchEvent(new KeyboardEvent("keydown", {key: "Alt", keyCode: 18, bubbles: true}));
+          await new Promise(r => setTimeout(r, timeout));
+      }
+      el.dispatchEvent(new KeyboardEvent("keydown", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+      await new Promise(r => setTimeout(r, timeout));
+      el.dispatchEvent(new KeyboardEvent("keyup", {key, keyCode, ctrlKey, altKey, metaKey, bubbles: true}));
+      if (altKey) {
+          await new Promise(r => setTimeout(r, timeout));
+          el.dispatchEvent(new KeyboardEvent("keyup", {key: "Alt", keyCode: 18, bubbles: true}));
+      }
+      if (ctrlKey) {
+          await new Promise(r => setTimeout(r, timeout));
+          el.dispatchEvent(new KeyboardEvent("keyup", {key: "Control", keyCode: 17, bubbles: true}));
+      }
+  }
+
   async play() {
     const container = document.createElement("div");
-    container.id = "emulator-container";
+    container.id = containerName;
     this.append(container);
     this.container = container;
     this.backendUrl = this.getAttribute("eaas-service");
