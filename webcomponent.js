@@ -168,16 +168,11 @@ class EaasClientElement extends HTMLElement {
 
       const componentSession = client.getSession(componentId);
       this.session = componentSession;
-      monitorStateChanges();
     } else {
       await client.start(components, clientOptions);
-      if (enableInternet) {
-        this.session = await client.getSession(
-          (await client.getSessions())[0].id
-        );
-        monitorStateChanges();
-      }
+      this.session = client.getActiveSession();
     }
+    monitorStateChanges();
     await client.connect(container);
     for (const el of [...this.childNodes])
       if (el !== this.container) el.remove();
