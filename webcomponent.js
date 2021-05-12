@@ -170,12 +170,16 @@ class EaasClientElement extends HTMLElement {
       this.session = componentSession;
     } else {
       await client.start(components, clientOptions);
-      this.session = client.getActiveSession();
     }
-    monitorStateChanges();
     await client.connect(container);
+
+    if(this.session == null)
+      this.session = client.getActiveSession();
+
     for (const el of [...this.childNodes])
       if (el !== this.container) el.remove();
+    
+    monitorStateChanges();
   }
   attributeChangedCallback() {}
 }
