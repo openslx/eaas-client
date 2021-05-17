@@ -127,7 +127,6 @@ class EaasClientElement extends HTMLElement {
     };
 
     let clientOptions = new ClientOptions();
-    if (xpraEncoding) clientOptions.setXpraEncoding(xpraEncoding);
     let components = [machine];
 
     if (enableInternet) {
@@ -169,6 +168,7 @@ class EaasClientElement extends HTMLElement {
       const componentSession = client.getSession(componentId);
       this.session = componentSession;
     } else {
+      if (xpraEncoding) clientOptions.setXpraEncoding(xpraEncoding);
       await client.start(components, clientOptions);
     }
     await client.connect(container);
