@@ -9,6 +9,7 @@ test "$(git status --porcelain)" && echo error: Working tree is not clean >&2 &&
 script="
 curl -LO https://unpkg.com/web-streams-polyfill/LICENSE
 curl -LO https://unpkg.com/web-streams-polyfill/dist/ponyfill.es2018.mjs
+mv ponyfill.es2018.mjs ponyfill.es2018.mjs.js
 "
 eval "$script"
 
