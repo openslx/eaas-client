@@ -87,6 +87,20 @@ globalThis.loadXpra = (
   });
   container.append(windowsList);
 
+  document.addEventListener("visibilitychange", (e) => {
+    const window_ids = Object.keys(client.id_to_window).map(Number);
+    if (client.connected) {
+      if (document.hidden) {
+        client.send(["suspend", true, window_ids]);
+      }
+      else {
+        client.send(["resume", true, window_ids]);
+        client.redraw_windows();
+        client.request_refresh(-1);
+      }
+    }
+  });
+
   client.debug = () => {};
   client.remote_logging = true;
   client.clipboard_enabled = false;
