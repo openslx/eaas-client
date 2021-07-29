@@ -7,3 +7,6 @@
 [submodule "third_party/event-target"]
 	path = third_party/event-target
 	url = https://github.com/ungap/event-target
+[submodule "third_party/text-encode-transform-polyfill"]
+	path = third_party/text-encode-transform-polyfill
+	url = https://github.com/GoogleChromeLabs/text-encode-transform-polyfill
