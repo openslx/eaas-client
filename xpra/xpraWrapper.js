@@ -90,6 +90,6 @@ const importXpra = once(async () => {
 });
 
 export async function prepareAndLoadXpra(xpraUrl, xpraConf) {
-  await importXpra();
-  this.xpraClient = loadXpra(xpraUrl, xpraPath, xpraConf, this);
+    await importXpra();
+    return loadXpra(xpraUrl, xpraPath, xpraConf, this);
 }

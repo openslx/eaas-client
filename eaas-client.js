@@ -11,39 +11,20 @@ import {
     sendCtrlAltDel,
     sendAltTab,
     _fetch,
-    requestPointerLock
 } from "./lib/util.js";
-import {
-    loadJQuery,
-    prepareAndLoadXpra
-} from "./xpra/xpraWrapper.js";
-import {
-    importGuacamole
-} from "./guacamole/guacamoleWrapper.js"
+
 
 import EventTarget from "./third_party/event-target/esm/index.js";
 
 export {
     sendEsc,
     sendCtrlAltDel,
-    sendAltTab,
-    requestPointerLock
+    sendAltTab
 };
 export {
     ClientError,
     SnapshotRequestBuilder
 };
-
-function strParamsToObject(str) {
-    var result = {};
-    if (!str) return result; // return on empty string
-
-    str.split("&").forEach(function (part) {
-        var item = part.split("=");
-        result[item[0]] = decodeURIComponent(item[1]);
-    });
-    return result;
-}
 
 /**
  * Main EaaS Client class 
@@ -74,8 +55,6 @@ export class Client extends EventTarget {
 
         this.deleteOnUnload = true;
 
-        this.params = null;
-        this.mode = null;
         this.options = null;
 
         this.sessions = [];
@@ -160,21 +139,6 @@ export class Client extends EventTarget {
         }
     }
 
-    _onResize(width, height) {
-
-        if (!this.container) {
-            console.log("container null: ");
-            console.log(this);
-            return;
-        }
-
-        this.container.style.width = width;
-        this.container.style.height = height;
-
-        if (this.onResize) {
-            this.onResize(width, height);
-        }
-    }
     /**
      *
      *
@@ -211,17 +175,6 @@ export class Client extends EventTarget {
         if (!this.activeView) {
             return;
         }
-
-        console.log("Disconnecting viewer...");
-        if (this.mode === "guac") {
-            this.guac.disconnect();
-            BWFLA.unregisterEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
-        } else if (this.mode === "xpra") {
-            this.xpraClient.close();
-        }
-
-        if (this.rtcPeerConnection != null)
-            this.rtcPeerConnection.close();
 
         let myNode = this.emulatorContainer;
         // it's supposed to be faster, than / myNode.innerHTML = ''; /
@@ -301,9 +254,10 @@ export class Client extends EventTarget {
     async start(components, options) {
 
         if (options) {
+            console.log("setting xpra encoding to " + options.getXpraEncoding());
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
         }
-        console.log(components);
+        
         try {
             const promisedComponents = components.map(async component => {
                 component.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
@@ -314,10 +268,14 @@ export class Client extends EventTarget {
                 }
                 return componentSession;
             });
+
+            console.log("starting client side keep alive");
             this.pollStateIntervalId = setInterval(() => {
                 this._pollState();
             }, 1500);
+
             await Promise.all(promisedComponents);
+
 
             if (options && options.isNetworkEnabled()) {
                 console.log("starting network...");
@@ -414,14 +372,14 @@ export class Client extends EventTarget {
 
         for (let session of networkSessions) {
             const conf = this.network.getNetworkConfig(session.componentId);
+            let componentSession = this.getSession(conf.componentId);
+            console.log(componentSession);
             sessionInfo.push({
                 id: conf.componentId,
                 title: conf.networkLabel
             });
         }
-
         return sessionInfo;
-
     }
 
     /**
@@ -451,50 +409,10 @@ export class Client extends EventTarget {
             throw new Error("no active view possible");
 
         this.activeView = view;
-
-        this.container = container;
-        console.log(`Connecting viewer... @ ${this.container}`);
+        console.log(`Connecting viewer... @ ${container}`);
         try {
-            let result = await this.activeView.getControlUrl();
-            let connectViewerFunc, controlUrl;
-            let viewerData;
-
-            // Get the first ws+ethernet connector
-            const entries = Object.entries(result).filter(([k]) => k.match(/^ws\+ethernet\+/));
-            if (entries.length)
-                this.ethernetURL = entries[0][1];
-
-            // Guacamole connector?
-            if (result.guacamole) {
-                controlUrl = result.guacamole;
-                this.params = strParamsToObject(result.guacamole.substring(result.guacamole.indexOf("#") + 1));
-                connectViewerFunc = this._establishGuacamoleTunnel;
-                this.mode = "guac";
-            }
-            // XPRA connector
-            else if (result.xpra) {
-                controlUrl = result.xpra;
-                this.params = strParamsToObject(result.xpra.substring(result.xpra.indexOf("#") + 1));
-                connectViewerFunc = prepareAndLoadXpra;
-                this.mode = "xpra";
-                viewerData = this.xpraConf;
-            }
-            // WebEmulator connector
-            else if (result.webemulator) {
-                controlUrl = encodeURIComponent(JSON.stringify(result));
-                this.params = strParamsToObject(result.webemulator.substring(result.webemulator.indexOf("#") + 1));
-                connectViewerFunc = this._prepareAndLoadWebEmulator;
-            } else {
-                throw Error("Unsupported connector type: " + result);
-            }
-            // Establish the connection
-            await connectViewerFunc.call(this, controlUrl, viewerData);
-            console.log("Viewer connected successfully.");
+            await this.activeView.connect(container, this.xpraConf);
             this.isConnected = true;
-
-            if (typeof result.audio !== "undefined")
-                this._initWebRtcAudio(result.audio);
-
         } catch (e) {
             console.error("Connecting viewer failed!");
             console.log(e);
@@ -533,366 +451,6 @@ export class Client extends EventTarget {
                 result: result
             });
         }
-
-        $(this.container).empty();
         return results;
     }
-
-    async _establishGuacamoleTunnel(controlUrl) {
-        await importGuacamole();
-        // TODO: Remove direct jQuery dependencies from eaas-client
-        await loadJQuery();
-        $.fn.focusWithoutScrolling = function () {
-            var x = window.scrollX,
-                y = window.scrollY;
-            this.focus();
-            window.scrollTo(x, y);
-            return this;
-        };
-
-        // Remove old display element, if present
-        if (this.guac) {
-            var element = this.guac.getDisplay().getElement();
-            $(element).remove();
-        }
-
-        this.guac = new Guacamole.Client(new Guacamole.HTTPTunnel(controlUrl.split("#")[0]));
-        var displayElement = this.guac.getDisplay().getElement();
-
-        this.guac.onerror = function (status) {
-            console.log("GUAC-ERROR-RESPONSE:", status.code, " -> ", status.message);
-        };
-
-        hideClientCursor(this.guac);
-        this.container.insertBefore(displayElement, this.container.firstChild);
-
-        BWFLA.registerEventCallback(this.guac.getDisplay(), 'resize', this._onResize.bind(this));
-        this.guac.connect();
-
-        var mouse = new Guacamole.Mouse(displayElement);
-        var touch = new Guacamole.Mouse.Touchpad(displayElement);
-        var mousefix = new BwflaMouse(this.guac);
-
-        //touch.onmousedown = touch.onmouseup = touch.onmousemove =
-        //mouse.onmousedown = mouse.onmouseup = mouse.onmousemove =
-        //function(mouseState) { guac.sendMouseState(mouseState); };
-
-        mouse.onmousedown = touch.onmousedown = mousefix.onmousedown;
-        mouse.onmouseup = touch.onmouseup = mousefix.onmouseup;
-        mouse.onmousemove = touch.onmousemove = mousefix.onmousemove;
-
-        var keyboard = new Guacamole.Keyboard(displayElement);
-
-        keyboard.onkeydown = function (keysym) {
-            this.guac.sendKeyEvent(1, keysym);
-        }.bind(this);
-        keyboard.onkeyup = function (keysym) {
-            this.guac.sendKeyEvent(0, keysym);
-        }.bind(this);
-
-        $(displayElement).attr('tabindex', '0');
-        $(displayElement).css('outline', '0');
-        $(displayElement).mouseenter(function () {
-            $(this).focusWithoutScrolling();
-        });
-
-        if (this.onReady) {
-            this.onReady();
-        }
-    }
-
-    _prepareAndLoadWebEmulator(url) {
-        /*
-         search for eaas-client.js path, in order to include it to filePath
-         */
-        var scripts = document.getElementsByTagName("script");
-        var eaasClientPath = "";
-        var searchingAim = "eaas-client.js";
-        for (var prop in scripts) {
-            if (typeof (scripts[prop].src) != "undefined" && scripts[prop].src.indexOf(searchingAim) != -1) {
-                eaasClientPath = scripts[prop].src;
-            }
-        }
-        var webemulatorPath = eaasClientPath.substring(0, eaasClientPath.indexOf(searchingAim)) + "webemulator/";
-        var iframe = document.createElement("iframe");
-        iframe.setAttribute("style", "width: 100%; height: 600px;");
-        iframe.src = webemulatorPath + "#controlurls=" + url;
-        this.container.appendChild(iframe);
-    }
-
-    // WebRTC based sound
-    async _initWebRtcAudio(url) {
-        //const audioStreamElement = document.createElement('audio');
-        //audioStreamElement.controls = true;
-        //document.documentElement.appendChild(audioStreamElement);
-
-        await fetch(url + '?connect', {
-            method: 'POST'
-        });
-
-        let _url = new URL(url);
-        console.log("using host: " + _url.hostname + " for audio connection");
-        const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
-        const audioctx = new AudioContext();
-
-        let configuredIceServers = [{
-            urls: 'stun:stun.l.google.com:19302'
-        }, ];
-
-        if (_url.hostname !== "localhost") {
-            configuredIceServers.push({
-                urls: "turn:" + _url.hostname,
-                username: "eaas",
-                credential: "eaas"
-            });
-        }
-
-        const rtcConfig = {
-            iceServers: configuredIceServers
-        };
-        console.log("Creating RTC peer connection...");
-        this.rtcPeerConnection = new RTCPeerConnection(rtcConfig);
-
-        this.rtcPeerConnection.onicecandidate = async (event) => {
-            if (!event.candidate) {
-                console.log("ICE candidate exchange finished!");
-                return;
-            }
-
-            console.log("Sending ICE candidate to server...", event.candidate);
-
-            const body = {
-                type: 'ice',
-                data: event.candidate
-            };
-
-            const request = {
-                method: 'POST',
-                body: JSON.stringify(body)
-            };
-
-            await fetch(url, request);
-        };
-
-        /*
-        client.rtcPeerConnection.ontrack = async (event) => {
-            console.log("XXXXXXXXXXXXXXXX ONTRACK: ", event);
-            console.log("Remote track received");
-            audioStreamElement.srcObject = event.streams[0];
-            //audioctx.createMediaStreamSource(event.streams[0])
-            //    .connect(audioctx.destination);
-        };
-        */
-
-        this.rtcPeerConnection.onaddstream = async (event) => {
-            console.log("Remote stream received");
-            // HACK: Work around https://bugs.chromium.org/p/chromium/issues/detail?id=933677
-            new Audio().srcObject = event.stream;
-            audioctx.createMediaStreamSource(event.stream)
-                .connect(audioctx.destination);
-        };
-
-        const onServerError = (reason) => {
-            console.log("Stop polling control-messages! Reason:", reason);
-        };
-
-        const onServerMessage = async (response) => {
-            if (!response.ok) {
-                console.log("Stop polling control-messages, server returned:", response.status);
-                return;
-            }
-
-            try {
-                const message = await response.json();
-                if (message) {
-                    switch (message.type) {
-                        case 'ice':
-                            console.log("Remote ICE candidate received");
-                            console.log(message.data.candidate);
-                            const candidate = new RTCIceCandidate(message.data);
-
-                            await this.rtcPeerConnection.addIceCandidate(candidate);
-                            break;
-
-                        case 'sdp':
-                            console.log("Remote SDP offer received");
-                            console.log(message.data.sdp);
-                            const offer = new RTCSessionDescription(message.data);
-
-                            await this.rtcPeerConnection.setRemoteDescription(offer);
-                            const answer = await this.rtcPeerConnection.createAnswer();
-                            await this.rtcPeerConnection.setLocalDescription(answer);
-                            console.log("SDP-Answer: ", answer.sdp);
-
-                            const body = {
-                                type: 'sdp',
-                                data: answer
-                            };
-
-                            const request = {
-                                method: 'POST',
-                                body: JSON.stringify(body)
-                            };
-
-                            console.log("Sending SDP answer...");
-                            await fetch(url, request);
-
-                            break;
-
-                        case 'eos':
-                            console.log("Stop polling control-messages");
-                            return;
-
-                        default:
-                            console.error("Unsupported message type: " + message.type);
-                    }
-                }
-            } catch (error) {
-                console.log(error);
-            }
-
-            // start next long-polling request
-            fetch(url).then(onServerMessage, onServerError);
-        };
-
-        fetch(url).then(onServerMessage);
-    }
-}
-/*
- *  Example usage:
- *
- *      var centerOnScreen = function(width, height) {
- *          ...
- *      }
- *
- *      var resizeIFrame = function(width, height) {
- *          ...
- *      }
- *
- *      BWFLA.registerEventCallback(<target-1>, 'resize', centerOnScreen);
- *      BWFLA.registerEventCallback(<target-2>, 'resize', centerOnScreen);
- *      BWFLA.registerEventCallback(<target-2>, 'resize', resizeIFrame);
- */
-
-var BWFLA = BWFLA || {};
-
-// Method to attach a callback to an event
-BWFLA.registerEventCallback = function (target, eventName, callback) {
-    var event = 'on' + eventName;
-
-    if (!(event in target)) {
-        console.error('Event ' + eventName + ' not supported!');
-        return;
-    }
-
-    // Add placeholder for event-handlers to target's prototype
-    if (!('__bwFlaEventHandlers__' in target))
-        target.constructor.prototype.__bwFlaEventHandlers__ = {};
-
-    // Initialize the list for event's callbacks
-    if (!(event in target.__bwFlaEventHandlers__))
-        target.__bwFlaEventHandlers__[event] = [];
-
-    // Add the new callback to event's callback-list
-    var callbacks = target.__bwFlaEventHandlers__[event];
-    callbacks.push(callback);
-
-    // If required, initialize handler management function
-    if (target[event] == null) {
-        target[event] = function () {
-            var params = arguments; // Parameters to the original callback
-
-            // Call all registered callbacks one by one
-            callbacks.forEach(function (func) {
-                func.apply(target, params);
-            });
-        };
-    }
-};
-
-
-// Method to unregister a callback for an event
-BWFLA.unregisterEventCallback = function (target, eventName, callback) {
-    // Look in the specified target for the callback and
-    // remove it from the execution chain for this event
-
-    if (!('__bwFlaEventHandlers__' in target))
-        return;
-
-    var callbacks = target.__bwFlaEventHandlers__['on' + eventName];
-    if (callbacks == null)
-        return;
-
-    var index = callbacks.indexOf(callback);
-    if (index > -1)
-        callbacks.splice(index, 1);
-};
-
-/** Custom mouse-event handlers for use with the Guacamole.Mouse */
-var BwflaMouse = function (client) {
-    var events = [];
-    var handler = null;
-    var waiting = false;
-
-
-    /** Adds a state's copy to the current event-list. */
-    function addEventCopy(state) {
-        var copy = new Guacamole.Mouse.State(state.x, state.y, state.left,
-            state.middle, state.right, state.up, state.down);
-
-        events.push(copy);
-    }
-
-    /** Sets a new timeout-callback, replacing the old one. */
-    function setNewTimeout(callback, timeout) {
-        if (handler != null)
-            window.clearTimeout(handler);
-
-        handler = window.setTimeout(callback, timeout);
-    }
-
-    /** Handler, called on timeout. */
-    function onTimeout() {
-        while (events.length > 0)
-            client.sendMouseState(events.shift());
-
-        handler = null;
-        waiting = false;
-    }
-
-
-    /** Handler for mouse-down events. */
-    this.onmousedown = function (state) {
-        setNewTimeout(onTimeout, 100);
-        addEventCopy(state);
-        waiting = true;
-    };
-
-    /** Handler for mouse-up events. */
-    this.onmouseup = function (state) {
-        setNewTimeout(onTimeout, 150);
-        addEventCopy(state);
-        waiting = true;
-    };
-
-    /** Handler for mouse-move events. */
-    this.onmousemove = function (state) {
-        if (waiting == true)
-            addEventCopy(state);
-        else client.sendMouseState(state);
-    };
-};
-
-
-/** Hides the layer containing client-side mouse-cursor. */
-export function hideClientCursor(guac) {
-    var display = guac.getDisplay();
-    display.showCursor(false);
-}
-
-
-/** Shows the layer containing client-side mouse-cursor. */
-export function showClientCursor(guac) {
-    var display = guac.getDisplay();
-    display.showCursor(true);
 }
