@@ -57,6 +57,88 @@ const patchXpra = () => {
       },
     }
   );
+
+  // HACK: Make mouse movement relative
+  XpraClient.prototype.do_window_mouse_move = new Proxy(
+    XpraClient.prototype.do_window_mouse_move,
+    {
+      apply(target, thisArg, argArray) {
+        const [e, window] = argArray;
+        if (thisArg.clientGrabbed) {
+          const RELATIVE = -10_000;
+          const { movementX, movementY } = e.originalEvent;
+          const modifiers = thisArg._keyb_get_modifiers(e);
+          const buttons = [];
+          thisArg.send([
+            "pointer-position",
+            thisArg.clientGrabbedWid,
+            [movementX + RELATIVE, movementY + RELATIVE],
+            modifiers,
+            buttons,
+          ]);
+          return;
+        }
+        return Reflect.apply(target, thisArg, argArray);
+      },
+    }
+  );
+
+  XpraClient.prototype.do_window_mouse_click = new Proxy(
+    XpraClient.prototype.do_window_mouse_click,
+    {
+      apply(target, thisArg, argArray) {
+        const [e, window, pressed] = argArray;
+        if (thisArg.forceRelativeMouse && !thisArg.clientGrabbed) {
+          const { container } = thisArg;
+          const doc = container.ownerDocument;
+          container.requestPointerLock();
+          const change = ({ target }) => {
+            if (!target.pointerLockElement) {
+              thisArg.clientGrabbed = false;
+              remove();
+            } else {
+              thisArg.clientGrabbed = true;
+              thisArg.clientGrabbedWid = window && window.wid;
+            }
+          };
+          const error = () => {
+            console.error("Could not lock pointer");
+            remove();
+          };
+          const remove = () => {
+            doc.removeEventListener("pointerlockchange", change);
+            doc.removeEventListener("pointerlockerror", error);
+          };
+          doc.addEventListener("pointerlockchange", change);
+          doc.addEventListener("pointerlockerror", error);
+          return;
+        }
+        return Reflect.apply(target, thisArg, argArray);
+      },
+    }
+  );
+
+  XpraClient.prototype.getMouse = new Proxy(XpraClient.prototype.getMouse, {
+    apply(target, thisArg, argArray) {
+      const ret = Reflect.apply(target, thisArg, argArray);
+      if (thisArg.clientGrabbed) {
+        ret.x = -10000;
+        ret.y = -10000;
+      }
+      return ret;
+    },
+  });
+
+  // For debug use in `xpra-html5/html5/index.html`
+  /*
+  XpraClient = new Proxy(XpraClient, {
+    construct(target, argArray, newTarget) {
+      const thisArg = Reflect.construct(target, argArray, newTarget);
+      thisArg.forceRelativeMouse = true;
+      return thisArg;
+    },
+  });
+  */
 };
 
 globalThis.loadXpra = (
@@ -92,8 +174,7 @@ globalThis.loadXpra = (
     if (client.connected) {
       if (document.hidden) {
         client.send(["suspend", true, window_ids]);
-      }
-      else {
+      } else {
         client.send(["resume", true, window_ids]);
         client.redraw_windows();
         client.request_refresh(-1);
@@ -113,6 +194,7 @@ globalThis.loadXpra = (
   client.audio_httpstream_enabled = false;
   if (xpraEncoding) client.enable_encoding(xpraEncoding);
   client.keyboard_layout = Utilities.getKeyboardLayout();
+  client.forceRelativeMouse = true;
 
   const ignore_audio_blacklist = false;
   client.init(ignore_audio_blacklist);
