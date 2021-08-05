@@ -58,6 +58,8 @@ const patchXpra = () => {
     }
   );
 
+  XpraClient.prototype.process_xdg_menu = () => {};
+
   // HACK: Make mouse movement relative
   XpraClient.prototype.do_window_mouse_move = new Proxy(
     XpraClient.prototype.do_window_mouse_move,
