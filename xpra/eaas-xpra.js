@@ -58,6 +58,17 @@ const patchXpra = () => {
     }
   );
 
+  Object.defineProperty(XpraWindow.prototype, "windowtype", {
+    get() {
+      return "+";
+    },
+    set(v) {},
+  });
+
+  XpraClient.prototype.on_first_ui_event = function () {
+    this.id_to_window[this.topwindow].move(0, 0);
+  };
+
   XpraClient.prototype.process_xdg_menu = () => {};
 
   // HACK: Make mouse movement relative
