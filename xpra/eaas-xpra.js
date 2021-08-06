@@ -34,16 +34,15 @@ const patchXpra = () => {
     this.div.css("z-index", "1000");
   };
 
-  const proxyVisible = {
-    apply(target, thisArg, argArray) {
-      const { clientHeight, clientWidth } = thisArg.container;
-      if (clientHeight === 0 || clientWidth === 0) return true;
-      return Reflect.apply(target, thisArg, argArray);
-    },
-  };
   XpraClient.prototype._keyb_process = new Proxy(
     XpraClient.prototype._keyb_process,
-    proxyVisible
+    {
+      apply(target, thisArg, argArray) {
+        const { clientHeight, clientWidth } = thisArg.container;
+        if (clientHeight === 0 || clientWidth === 0) return true;
+        return Reflect.apply(target, thisArg, argArray);
+      },
+    }
   );
 
   XpraClient.prototype._new_window = new Proxy(
@@ -72,20 +71,20 @@ const patchXpra = () => {
   XpraClient.prototype.process_xdg_menu = () => {};
 
   // HACK: Make mouse movement relative
+  const RELATIVE_OFFSET = -10_000;
   XpraClient.prototype.do_window_mouse_move = new Proxy(
     XpraClient.prototype.do_window_mouse_move,
     {
       apply(target, thisArg, argArray) {
         const [e, window] = argArray;
         if (thisArg.clientGrabbed) {
-          const RELATIVE = -10_000;
           const { movementX, movementY } = e.originalEvent;
           const modifiers = thisArg._keyb_get_modifiers(e);
           const buttons = [];
           thisArg.send([
             "pointer-position",
             thisArg.clientGrabbedWid,
-            [movementX + RELATIVE, movementY + RELATIVE],
+            [movementX + RELATIVE_OFFSET, movementY + RELATIVE_OFFSET],
             modifiers,
             buttons,
           ]);
@@ -135,8 +134,8 @@ const patchXpra = () => {
     apply(target, thisArg, argArray) {
       const ret = Reflect.apply(target, thisArg, argArray);
       if (thisArg.clientGrabbed) {
-        ret.x = -10000;
-        ret.y = -10000;
+        ret.x = RELATIVE_OFFSET;
+        ret.y = RELATIVE_OFFSET;
       }
       return ret;
     },
