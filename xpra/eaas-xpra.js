@@ -157,7 +157,7 @@ const patchXpra = () => {
 globalThis.loadXpra = (
   xpraUrl,
   xpraPath,
-  { xpraEncoding } = {},
+  { xpraEncoding, pointerLock } = {},
   eaasClientObj
 ) => {
   {
@@ -207,7 +207,7 @@ globalThis.loadXpra = (
   client.audio_httpstream_enabled = false;
   if (xpraEncoding) client.enable_encoding(xpraEncoding);
   client.keyboard_layout = Utilities.getKeyboardLayout();
-  client.forceRelativeMouse = true;
+  client.forceRelativeMouse = pointerLock;
 
   const ignore_audio_blacklist = false;
   client.init(ignore_audio_blacklist);
