@@ -59,9 +59,11 @@ const patchXpra = () => {
 
   Object.defineProperty(XpraWindow.prototype, "windowtype", {
     get() {
-      return "+";
+      return this.client.windowDecorations ? this._windowtype : "+";
     },
-    set(v) {},
+    set(v) {
+      this._windowtype = v;
+    },
   });
 
   XpraClient.prototype.on_first_ui_event = function () {
@@ -207,6 +209,7 @@ globalThis.loadXpra = (
   if (xpraEncoding) client.enable_encoding(xpraEncoding);
   client.keyboard_layout = Utilities.getKeyboardLayout();
   client.forceRelativeMouse = true;
+  client.windowDecorations = false;
 
   const ignore_audio_blacklist = false;
   client.init(ignore_audio_blacklist);
