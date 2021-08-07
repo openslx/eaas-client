@@ -158,7 +158,7 @@ const patchXpra = () => {
 globalThis.loadXpra = (
   xpraUrl,
   xpraPath,
-  { xpraEncoding, pointerLock } = {},
+  { xpraEncoding, pointerLock = false } = {},
   eaasClientObj
 ) => {
   {
