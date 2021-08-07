@@ -10,6 +10,6 @@
         url.host = server;
         url.port = port;
         console.log(url);
-        prepareAndLoadXpra(String(url));
+        globalThis.client = await prepareAndLoadXpra.call({}, String(url));
     })();
 </script>

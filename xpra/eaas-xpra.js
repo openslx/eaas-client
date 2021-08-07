@@ -85,7 +85,7 @@ const patchXpra = () => {
           const buttons = [];
           thisArg.send([
             "pointer-position",
-            thisArg.clientGrabbedWid,
+            thisArg.clientGrabbedWid || thisArg.topwindow,
             [movementX + RELATIVE_OFFSET, movementY + RELATIVE_OFFSET],
             modifiers,
             buttons,
