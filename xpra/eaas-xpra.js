@@ -104,6 +104,7 @@ const patchXpra = () => {
       apply(target, thisArg, argArray) {
         const [e, window, pressed] = argArray;
         if (thisArg.forceRelativeMouse && !thisArg.clientGrabbed) {
+          thisArg._clientGrabbedFirstClick = true;
           const { container } = thisArg;
           const doc = container.ownerDocument;
           container.requestPointerLock();
@@ -126,9 +127,10 @@ const patchXpra = () => {
           };
           doc.addEventListener("pointerlockchange", change);
           doc.addEventListener("pointerlockerror", error);
-          return;
         }
-        return Reflect.apply(target, thisArg, argArray);
+        const ret = Reflect.apply(target, thisArg, argArray);
+        if (!pressed) thisArg._clientGrabbedFirstClick = false;
+        return ret;
       },
     }
   );
@@ -136,7 +138,7 @@ const patchXpra = () => {
   XpraClient.prototype.getMouse = new Proxy(XpraClient.prototype.getMouse, {
     apply(target, thisArg, argArray) {
       const ret = Reflect.apply(target, thisArg, argArray);
-      if (thisArg.clientGrabbed) {
+      if (!thisArg._clientGrabbedFirstClick && thisArg.forceRelativeMouse) {
         ret.x = RELATIVE_OFFSET;
         ret.y = RELATIVE_OFFSET;
       }
@@ -212,6 +214,8 @@ globalThis.loadXpra = (
 
   client.forceRelativeMouse = pointerLock;
   client.windowDecorations = false;
+
+  client._clientGrabbedFirstClick = false;
 
   client.eaasFirstWindow = new Promise(
     (r) => (client._eaasFirstWindowResolve = r)
