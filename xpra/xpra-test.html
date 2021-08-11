@@ -1,15 +1,3 @@
 <!doctype html>
 <div id="emulator-container"></div>
-<script type="module">
-    import { prepareAndLoadXpra } from "./xpraWrapper.js";
-
-    (async () => {
-        const { ssl, server, port } = Object.fromEntries(new URL(location).searchParams);
-        const url = new URL("https://invalid/");
-        url.protocol = ssl === "true" ? "wss" : "ws";
-        url.host = server;
-        url.port = port;
-        console.log(url);
-        globalThis.client = await prepareAndLoadXpra.call({}, String(url));
-    })();
-</script>
+<script type="module" src="xpra-test.js"></script>

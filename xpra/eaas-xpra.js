@@ -67,6 +67,7 @@ const patchXpra = () => {
   });
 
   XpraClient.prototype.on_first_ui_event = function () {
+    this._eaasFirstWindowResolve();
     this.id_to_window[this.topwindow].move(0, 0);
   };
 
@@ -211,6 +212,10 @@ globalThis.loadXpra = (
 
   client.forceRelativeMouse = pointerLock;
   client.windowDecorations = false;
+
+  client.eaasFirstWindow = new Promise(
+    (r) => (client._eaasFirstWindowResolve = r)
+  );
 
   const ignore_audio_blacklist = false;
   client.init(ignore_audio_blacklist);
