@@ -11,6 +11,7 @@ import { prepareAndLoadXpra } from "./xpraWrapper.js";
   console.log(url);
   const client = await prepareAndLoadXpra.call({}, String(url), {
     pointerLock: true,
+    debugLogPackets: true,
   });
   globalThis.client = client;
   client.eaasFirstWindow.then(() => document.body.style.backgroundColor = "green");

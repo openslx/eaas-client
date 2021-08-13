@@ -57,6 +57,18 @@ const patchXpra = () => {
     }
   );
 
+  XpraClient.prototype.send = new Proxy(XpraClient.prototype.send, {
+    apply(target, thisArg, argArray) {
+      if (
+        thisArg.debugLogPackets === true ||
+        thisArg.debugLogPackets?.includes(argArray[0][0])
+      ) {
+        console.debug(argArray[0].flat());
+      }
+      return Reflect.apply(target, thisArg, argArray);
+    },
+  });
+
   Object.defineProperty(XpraWindow.prototype, "windowtype", {
     get() {
       return this.client.windowDecorations ? this._windowtype : "+";
@@ -161,7 +173,7 @@ const patchXpra = () => {
 globalThis.loadXpra = (
   xpraUrl,
   xpraPath,
-  { xpraEncoding, pointerLock = false } = {},
+  { xpraEncoding, pointerLock = false, debugLogPackets } = {},
   eaasClientObj
 ) => {
   {
@@ -214,6 +226,7 @@ globalThis.loadXpra = (
 
   client.forceRelativeMouse = pointerLock;
   client.windowDecorations = false;
+  client.debugLogPackets = debugLogPackets;
 
   client._clientGrabbedFirstClick = false;
 
