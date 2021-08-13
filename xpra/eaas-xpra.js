@@ -80,8 +80,19 @@ const patchXpra = () => {
 
   XpraClient.prototype.on_first_ui_event = function () {
     this._eaasFirstWindowResolve();
-    this.id_to_window[this.topwindow].move(0, 0);
+    const topwindow = this.id_to_window[this.topwindow];
+    topwindow.move(0, 0);
+    topwindow.geometry_cb(topwindow);
   };
+
+  XpraClient.prototype._process_window_move_resize = new Proxy(
+    XpraClient.prototype._process_window_move_resize,
+    {
+      apply(target, thisArg, argArray) {
+        return;
+      },
+    }
+  );
 
   XpraClient.prototype.process_xdg_menu = () => {};
 
