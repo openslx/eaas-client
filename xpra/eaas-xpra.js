@@ -89,7 +89,10 @@ const patchXpra = () => {
     XpraClient.prototype._process_window_move_resize,
     {
       apply(target, thisArg, argArray) {
-        return;
+        const [packet] = argArray;
+        packet[2] = 0; // x
+        packet[3] = 0; // y
+        return Reflect.apply(target, thisArg, argArray);
       },
     }
   );
