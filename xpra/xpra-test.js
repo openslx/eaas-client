@@ -14,5 +14,7 @@ import { prepareAndLoadXpra } from "./xpraWrapper.js";
     debugLogPackets: true,
   });
   globalThis.client = client;
-  client.eaasFirstWindow.then(() => document.body.style.backgroundColor = "green");
+  client.eaasFirstWindow.then(
+    () => (document.body.style.backgroundColor = "green")
+  );
 })();
