@@ -86,7 +86,7 @@ const importXpra = once(async () => {
     loadScript(new URL("./js/Menu.js", xpraPath)),
     loadScript(new URL("./js/Menu-custom.js", xpraPath)),
   ]);
-  await loadStyleSheet(new URL("./xpra/eaas-xpra.css", baseUrl));
+  // await loadStyleSheet(new URL("./xpra/eaas-xpra.css", baseUrl));
 });
 
 export async function prepareAndLoadXpra(xpraUrl, xpraConf) {
