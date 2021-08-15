@@ -1,0 +1,12 @@
+#emulator-container {
+  position: relative;
+  min-width: 800px;
+  min-height: 600px;
+}
+
+.window, .undecorated {
+  position: absolute;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+}
