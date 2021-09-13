@@ -97,7 +97,7 @@ globalThis.loadXpra = (
   client.audio_mediasource_enabled = false;
   client.audio_aurora_enabled = false;
   client.audio_httpstream_enabled = false;
-  if (xpraEncoding) client.enable_encoding(xpraEncoding);
+  if (xpraEncoding && xpraEncoding !== "auto") client.enable_encoding(xpraEncoding);
   client.keyboard_layout = Utilities.getKeyboardLayout();
 
   const ignore_audio_blacklist = false;
