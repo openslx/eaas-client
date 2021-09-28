@@ -86,10 +86,10 @@ const importXpra = once(async () => {
     loadScript(new URL("./js/Menu.js", xpraPath)),
     loadScript(new URL("./js/Menu-custom.js", xpraPath)),
   ]);
-  // await loadStyleSheet(new URL("./css/client.css", xpraPath));
+  // await loadStyleSheet(new URL("./xpra/eaas-xpra.css", baseUrl));
 });
 
 export async function prepareAndLoadXpra(xpraUrl, xpraConf) {
-  await importXpra();
-  this.xpraClient = loadXpra(xpraUrl, xpraPath, xpraConf, this);
+    await importXpra();
+    return loadXpra(xpraUrl, xpraPath, xpraConf, this);
 }
