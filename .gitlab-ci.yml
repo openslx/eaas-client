@@ -20,4 +20,5 @@ pages:
     paths:
       - "*"
   only:
-    - pages
+    variables:
+       - $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
