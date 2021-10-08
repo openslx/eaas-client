@@ -5,6 +5,11 @@ import {
     ComponentSession, 
     SnapshotRequestBuilder
 } from "./lib/componentSession.js";
+
+import {
+    ComputeSession
+} from './lib/computeSession.js';
+
 import {
     ClientError,
     sendEsc,
@@ -276,8 +281,17 @@ export class Client extends EventTarget {
 
             await Promise.all(promisedComponents);
 
-
-            if (options && options.isNetworkEnabled()) {
+            if(!options)
+                return;
+            if(options.isHeadlessCompute)
+            {
+                let compute = new ComputeSession(this.API_URL, this.idToken);
+                await compute.start(this.sessions, options);
+                // we do not need the keepalive anymore. 
+                clearInterval(this.pollStateIntervalId);
+                return compute;
+            }
+            else if ( options.isNetworkEnabled()) {
                 console.log("starting network...");
                 this.network = new NetworkSession(this.API_URL, this.idToken);
                 await this.network.startNetwork(this.sessions, options);
