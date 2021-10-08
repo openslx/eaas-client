@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/networkBuilder.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/networkBuilder.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import {
+    _fetch,
+    assignRandomMac
+} from "./util.js";
+import {
+    ClientOptions,
+    NetworkComponentConfig
+} from "./clientOptions.js";
+import {
+    MachineComponentBuilder,
+    InputContentBuilder,
+    ContainerRuntimeBuilder,
+    InputBuilder
+} from "./componentBuilder.js";
+/**
+ *
+ *
+ * @export
+ * @class NetworkBuilder
+ * @param api
+ * @param [idToken=null]
+ */
+export class NetworkBuilder {
+
+    constructor(api, idToken = null) {
+        this.API_URL = api;
+        this.idToken = idToken;
+
+        console.log(this.idToken);
+
+        this.clientOptions = null;
+        this.components = [];
+
+        this.networkConfig = {
+            network: "10.0.0.0/24",
+            gateway: "10.0.0.1",
+            upstream_dns: "8.8.8.8",
+            dhcp: {
+                ip: "10.0.0.2"
+            },
+            environments: []
+        };
+    }
+    /**
+     *
+     *
+     * @param c
+     * @memberof NetworkBuilder
+     */
+    addComponent(c) {
+        let label = "machine " + this.components.length;
+        let networkComponentConfig = new NetworkComponentConfig(label);
+        c.setNetworkConfig(networkComponentConfig);
+        this.components.push(c);
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkBuilder
+     */
+    getComponents() {
+        return this.components;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkBuilder
+     */
+    getClientOptions() {
+        return this.clientOptions;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkBuilder
+     */
+    getDefaultClientOptions() {
+        return ClientOptions.getDefaultOptions();
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async getSessions() {
+        return _fetch(`${this.API_URL}/sessions`, "GET", null, this.idToken);
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkBuilder
+     */
+    getNetworkConfig()
+    {
+        return this.networkConfig;
+    }
+
+    /**
+     *
+     *
+     * @param sessionKey
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async getSession(sessionKey) {
+        let sessions = await this.getSessions();
+        if (!sessions)
+            throw new Error("no sessions found");
+
+        const session = sessions.find((s) => (s.name === sessionKey));
+        if (session)
+            return session;
+        else
+            throw new Error("session not found " + sessions + " key " + sessionKey);
+    }
+    /**
+     *
+     *
+     * @param id
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async getNetworkEnvironmentById(id) {
+        return await _fetch(`${this.API_URL}/network-environments/${id}`, "GET", null, this.idToken);
+    }
+    /**
+     *
+     *
+     * @param envId
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async getEnvironmentById(envId) {
+        return await _fetch(`${this.API_URL}environment-repository/environments/${envId}`, "GET", null, this.idToken);
+    }
+    /**
+     *
+     *
+     * @param networkEnvironment
+     * @memberof NetworkBuilder
+     */
+    async loadNetworkEnvironment(networkEnvironment) {
+        
+        this.clientOptions = new ClientOptions(networkEnvironment);
+        if(!networkEnvironment.emilEnvironments)
+            networkEnvironment.emilEnvironments = [];
+        for (const networkElement of networkEnvironment.emilEnvironments) {
+            let env = await this.getEnvironmentById(networkElement.envId);
+        
+            let component = new MachineComponentBuilder(env.envId, env.archive);
+            component.setEthernetAddress(networkElement.macAddress);
+            component.setObject(env.objectId, env.objectArchive);
+
+            if (networkElement.toVisualize) {
+                component.setInteractive();
+            }
+
+            let networkComponentConfig = new NetworkComponentConfig(networkElement.label, networkElement.macAddress);
+            networkComponentConfig.setServerConfiguration(networkElement.serverIp, networkElement.serverPorts);
+            networkComponentConfig.setFqdn(networkElement.fqdn);
+            component.setNetworkConfig(networkComponentConfig);
+
+            // this needs to be done elsewhere
+            component.setEthernetAddress(networkElement.macAddress);
+
+            this.components.push(component);
+        }
+
+        if (networkEnvironment.smbServiceEnvId) {
+            let smbEnvironment = await this.getEnvironmentById(networkEnvironment.smbServiceEnvId);
+            if(!smbEnvironment)
+                throw new Error("smb environment " + networkEnvironment.smbServiceEnvId + " not available.");
+            this.components.push(await this.buildSmbService(smbEnvironment));
+        }
+
+        if (networkEnvironment.linuxArchiveProxyEnvId) {
+            let linuxArchiveProxyEnvironment = await this.getEnvironmentById(networkEnvironment.linuxArchiveProxyEnvId);
+            if(!linuxArchiveProxyEnvironment)
+                throw new Error("linux archive proxy environment " + networkEnvironment.linuxArchiveProxyEnvId + " not available");
+            this.components.push(await this.buildLinuxArchiveService(linuxArchiveProxyEnvironment));
+        }
+
+        if (networkEnvironment.dnsServiceEnvId) {
+            let dnsEnvironment = await this.getEnvironmentById(networkEnvironment.dnsServiceEnvId);
+            if(!dnsEnvironment)
+                throw new Error("dnsEnvironment " + networkEnvironment.dnsServiceEnvId + " not available.");
+            this.components.push(await this.buildDnsService(dnsEnvironment, networkEnvironment.envId));
+        }
+
+    }
+    /**
+     *
+     *
+     * @param smbEnvironment
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async buildSmbService(smbEnvironment) {
+        const component = new MachineComponentBuilder(smbEnvironment.runtimeId, "public");
+        // component.setHeadless(true);
+        // const sts = await _fetch(`${this.API_URL}/user-data-storage/sts`, "GET", null, this.idToken);
+
+        let runtimeBuilder = new ContainerRuntimeBuilder(smbEnvironment.envId, smbEnvironment.archive);
+        runtimeBuilder.enableDhcp(true);
+        runtimeBuilder.mountUserShare(true);
+        // runtimeBuilder.addUserEnvironment("EAAS_STORAGE_CONFIG=" + JSON.stringify(sts));
+        // console.log(sts);
+        component.setRuntime(runtimeBuilder);
+        
+
+        let networkComponentConfig = new NetworkComponentConfig("Windows Network Storage Service");
+        networkComponentConfig.setFqdn("storage");
+        component.setNetworkConfig(networkComponentConfig);
+
+        return component;
+    }
+    /**
+     *
+     *
+     * @param config
+     * @memberof NetworkBuilder
+     */
+    async enableDhcpService(config) {
+        let dnsEnvironment = await this.getEnvironmentById("service-dns");
+        this.components.push(await this.buildDnsService(dnsEnvironment.runtimeId, null, config));
+    }
+    /**
+     *
+     *
+     * @param dnsEnvironment
+     * @param networkId
+     * @param [config=null]
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async buildDnsService(dnsEnvironment, networkId, config = null) {
+        let runtimeBuilder = new ContainerRuntimeBuilder(dnsEnvironment.envId, "public");
+        if(dnsEnvironment.networking) {
+            runtimeBuilder.enableDhcp(dnsEnvironment.networking.isDHCPenabled);
+            runtimeBuilder.enableTelnet(dnsEnvironment.networking.isTelnetEnabled);
+        }
+
+        if (!config) {
+            if (!networkId)
+                throw new Error("Either config or network ID is required to configure DHCP");
+            config = await _fetch(`${this.API_URL}/network-environments/${networkId}?json=true`);
+            config.environments.push(...this.networkConfig.environments);
+            // console.log('config :>> ', config);
+        }
+        runtimeBuilder.addUserEnvironment(`EAAS_NETWORK_CONFIG=${JSON.stringify(config)}`);
+
+        const component = new MachineComponentBuilder(dnsEnvironment.runtimeId, "public");
+        component.setRuntime(runtimeBuilder);
+        // component.setHeadless(true);
+
+        let networkComponentConfig = new NetworkComponentConfig("DNS/DHCP Service");
+        component.setNetworkConfig(networkComponentConfig);
+
+        return component;
+    }
+    
+    /**
+     *
+     *
+     * @memberof NetworkBuilder
+     */
+    async enableLinuxArchiveService() {
+        let linuxArchiveProxyEnvironment = await this.getEnvironmentById("service-archive-proxy");
+        this.components.push(await this.buildLinuxArchiveService(linuxArchiveProxyEnvironment));
+    }
+
+    /**
+     *
+     *
+     * @param archiveEnvironment
+     * @return
+     * @memberof NetworkBuilder
+     */
+    async buildLinuxArchiveService(archiveEnvironment) {
+        let runtimeBuilder = new ContainerRuntimeBuilder(archiveEnvironment.envId, archiveEnvironment.archive);
+        runtimeBuilder.enableDhcp(true);
+        if(archiveEnvironment.networking)
+            runtimeBuilder.enableTelnet(archiveEnvironment.networking.isTelnetEnabled);
+
+        const component = new MachineComponentBuilder(archiveEnvironment.runtimeId, "public");
+        component.setRuntime(runtimeBuilder);
+
+        let networkComponentConfig = new NetworkComponentConfig("Linux Archive Proxy Service", assignRandomMac());
+        networkComponentConfig.setFqdn("ftp.debian.org");
+        component.setNetworkConfig(networkComponentConfig);
+
+        this.networkConfig.environments.push({
+            mac: networkComponentConfig.hwAddress,
+            hostnames : [ networkComponentConfig.fqdn ]
+        });
+
+        return component;
+    }
+
+    async init(client, sessionKey, lifeTime) {
+        await client.start(this.components, this.clientOptions);
+        await client.detach(sessionKey, lifeTime);
+    }
+
+    async connectNetworkSession(client, networkId, sessionKey) {
+        let session = null;
+        try {
+            session = await this.getSession(sessionKey);
+            console.log(session);
+        } catch (e) {
+            console.log(e);
+        }
+
+        if (!session) {
+            await this.init(client, networkId, sessionKey);
+            session = await this.getSession(sessionKey);
+            console.log(session);
+        }
+        return session;
+    }
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a></li><li><a href="ClientError.html">ClientError</a></li><li><a href="ClientOptions.html">ClientOptions</a></li><li><a href="ComponentBuilder.html">ComponentBuilder</a></li><li><a href="ComponentOptions.html">ComponentOptions</a></li><li><a href="ComponentSession.html">ComponentSession</a></li><li><a href="ContainerBuilder.html">ContainerBuilder</a></li><li><a href="ContainerImageBuilder.html">ContainerImageBuilder</a></li><li><a href="ContainerRuntimeBuilder.html">ContainerRuntimeBuilder</a></li><li><a href="EmulatorBuilder.html">EmulatorBuilder</a></li><li><a href="InputBuilder.html">InputBuilder</a></li><li><a href="InputContentBuilder.html">InputContentBuilder</a></li><li><a href="MachineComponentBuilder.html">MachineComponentBuilder</a></li><li><a href="NetworkBuilder.html">NetworkBuilder</a></li><li><a href="NetworkComponentConfig.html">NetworkComponentConfig</a></li><li><a href="NetworkConfig.html">NetworkConfig</a></li><li><a href="NetworkSession.html">NetworkSession</a></li><li><a href="SaveImportRequest.html">SaveImportRequest</a></li><li><a href="SaveNewEnvironmentRequest.html">SaveNewEnvironmentRequest</a></li><li><a href="SaveObjectEnvironmentRequest.html">SaveObjectEnvironmentRequest</a></li><li><a href="SaveRevisionRequest.html">SaveRevisionRequest</a></li><li><a href="SaveUserSessionRequest.html">SaveUserSessionRequest</a></li><li><a href="TcpGatewayConfig.html">TcpGatewayConfig</a></li><li><a href="TransformStream.html">TransformStream</a></li><li><a href="UviMachineComponentBuilder.html">UviMachineComponentBuilder</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_fetch">_fetch</a></li><li><a href="global.html#assignRandomMac">assignRandomMac</a></li><li><a href="global.html#BwflaMouse">BwflaMouse</a></li><li><a href="global.html#hideClientCursor">hideClientCursor</a></li><li><a href="global.html#onmousedown">onmousedown</a></li><li><a href="global.html#onmousemove">onmousemove</a></li><li><a href="global.html#onmouseup">onmouseup</a></li><li><a href="global.html#requestPointerLock">requestPointerLock</a></li><li><a href="global.html#sendAltTab">sendAltTab</a></li><li><a href="global.html#sendEsc">sendEsc</a></li><li><a href="global.html#showClientCursor">showClientCursor</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Oct 08 2021 14:23:23 GMT+0200 (Mitteleuropäische Sommerzeit)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

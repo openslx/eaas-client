@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/clientOptions.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/clientOptions.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * EaaS client options to start a session
+ *
+ * @export
+ * @class ClientOptions
+ * @param [networkEnvironment=null]
+ */
+export class ClientOptions {
+    constructor(networkEnvironment = null) {
+        this._networkEnabled = (networkEnvironment) ? true : false;
+        this.networkConfig = new NetworkConfig(networkEnvironment);
+        this.xpraEncoding = null;
+    }
+    /**
+     *
+     *
+     * @param val
+     * @memberof ClientOptions
+     */
+    setXpraEncoding(val) {
+        this.xpraEncoding = val;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof ClientOptions
+     */
+    getXpraEncoding() {
+        return this.xpraEncoding;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof ClientOptions
+     */
+    getNetworkConfig() {
+        return this.networkConfig;
+    }
+    /**
+     *
+     *
+     * @param {boolean} [val=true]
+     * @memberof ClientOptions
+     */
+    enableNetworking(val = true) {
+        this._networkEnabled = val;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof ClientOptions
+     */
+    isNetworkEnabled() {
+        return this._networkEnabled;
+    }
+    /**
+     *
+     *
+     * @static
+     * @return
+     * @memberof ClientOptions
+     */
+    static getDefaultOptions() {
+        let clientOptions = new ClientOptions();
+        clientOptions.enableNetworking(true);
+        clientOptions.getNetworkConfig().setNetworkDefaults();
+
+        return clientOptions;
+    }
+}
+/**
+ * Network Configuration options
+ *
+ * @export
+ * @class NetworkConfig
+ * @param [networkEnvironment=null]
+ */
+export class NetworkConfig {
+    constructor(networkEnvironment = null) {
+        this.components = [];
+
+        if (!networkEnvironment) {
+            this._enableInternet = false;
+            this.dhcpEnabled = false;
+            this.gateway = null;
+            this.network = null;
+            this.tcpGatewayConfig = null;
+        } else {
+            this.setNetwork(networkEnvironment.network);
+            this.setGateway(networkEnvironment.gateway);
+            this.enableInternet(networkEnvironment.enableInternet);
+            if (!networkEnvironment.dnsServiceEnvId)
+                this.enableSlirpDhcp(networkEnvironment.isDHCPenabled);
+
+            try {
+                let tcpGatewayConfig = new TcpGatewayConfig(networkEnvironment.networking.serverIp, networkEnvironment.networking.serverPort);
+                tcpGatewayConfig.enableSocks(networkEnvironment.networking.enableSocks);
+                tcpGatewayConfig.enableLocalMode(networkEnvironment.networking.localServerMode);
+                this.setTcpGatewayConfig(tcpGatewayConfig);
+            } catch (e) {
+                // console.log(e);
+            }
+        }
+    }
+    /**
+     *
+     *
+     * @memberof NetworkConfig
+     */
+    setNetworkDefaults() {
+        this.setNetwork("10.0.0.0/24");
+        this.setGateway("10.0.0.1");
+    }
+    /**
+     *
+     *
+     * @param conf
+     * @memberof NetworkConfig
+     */
+    setTcpGatewayConfig(conf) {
+        this.tcpGatewayConfig = conf;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkConfig
+     */
+    getTcpGatewayConfig() {
+        return this.tcpGatewayConfig;
+    }
+    /**
+     *
+     *
+     * @param {boolean} [val=true]
+     * @memberof NetworkConfig
+     */
+    enableInternet(val) {
+        this._enableInternet = val;
+    }
+    /**
+     *
+     *
+     * @param {boolean} [val=true]
+     * @memberof NetworkConfig
+     */
+    enableSlirpDhcp(val) {
+        this.dhcpEnabled = val;
+    }
+    /**
+     *
+     *
+     * @param val
+     * @memberof NetworkConfig
+     */
+    setGateway(val) {
+        this.gateway = val;
+    }
+    /**
+     *
+     *
+     * @param val
+     * @memberof NetworkConfig
+     */
+    setNetwork(val) {
+        this.network = val;
+    }
+    /**
+     *
+     *
+     * @param component
+     * @memberof NetworkConfig
+     */
+    addNetworkComponent(component) {
+        this.components.push(component);
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkConfig
+     */
+    build() {
+        const hasTcpGateway = (this.tcpGatewayConfig &amp;&amp; !this.tcpGatewayConfig.isLocalModeEnabled()) ? true : false;
+
+        let networkRequest = {
+            hasInternet: this._enableInternet,
+            enableDhcp: this.dhcpEnabled,
+            gateway: this.gateway,
+            network: this.network,
+            hasTcpGateway: hasTcpGateway,
+            tcpGatewayConfig: this.tcpGatewayConfig ? this.tcpGatewayConfig.build() : {}
+        };
+
+        networkRequest.components = [];
+        this.components.forEach(element => {
+            networkRequest.components.push(element.build());
+        });
+        return networkRequest;
+    }
+}
+/**
+ *
+ *
+ * @export
+ * @class NetworkComponentConfig
+ * @param networkLabel
+ * @param hwAddress
+ */
+export class NetworkComponentConfig {
+    constructor(networkLabel, hwAddress) {
+        this.componentId = undefined; // unused?
+        this.networkLabel = networkLabel;
+        this.hwAddress = "auto";
+        this.fqdn = null;
+
+        this.serverIp = null;
+        this.serverPorts = null;
+
+        if (hwAddress)
+            this.hwAddress = hwAddress;
+    }
+    /**
+     *
+     *
+     * @param val
+     * @memberof NetworkComponentConfig
+     */
+    setFqdn(val) {
+        this.fqdn = val;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkComponentConfig
+     */
+    getFqdn() {
+        return this.fqdn;
+    }
+    /**
+     *
+     *
+     * @param componentId
+     * @memberof NetworkComponentConfig
+     */
+    setComponentId(componentId) {
+        this.componentId = componentId;
+    }
+    /**
+     *
+     *
+     * @param serverIp
+     * @param serverPorts
+     * @memberof NetworkComponentConfig
+     */
+    setServerConfiguration(serverIp, serverPorts) {
+        this.serverIp = serverIp;
+        this.serverPorts = serverPorts;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof NetworkComponentConfig
+     */
+    build() {
+        return {
+            componentId: this.componentId,
+            networkLabel: this.networkLabel,
+            fqdn: this.fqdn,
+            hwAddress: this.hwAddress,
+            serverIp: this.serverIp,
+            serverPorts: this.serverPorts
+        };
+    }
+}
+/**
+ *
+ * @export
+ * @class TcpGatewayConfig
+ * @param ip
+ * @param port
+ */
+export class TcpGatewayConfig {
+    constructor(ip, port) {
+        this.socks = null;
+
+        if (!ip || !port)
+            throw new Error("ip and portnumber are required");
+
+        this.serverPort = port;
+        this.serverIp = ip;
+        this.localMode = false; // if true -> tcpGateway is false, but config is set
+    }
+    /**
+     *
+     *
+     * @param {boolean} [val=true]
+     * @memberof TcpGatewayConfig
+     */
+    enableSocks(val = true) {
+        this.socks = val;
+    }
+    /**
+     *
+     *
+     * @param {boolean} [val=true]
+     * @memberof TcpGatewayConfig
+     */
+    enableLocalMode(val = true) {
+        this.localMode = val;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof TcpGatewayConfig
+     */
+    getServerIp() {
+        return this.serverIp;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof TcpGatewayConfig
+     */
+    getServerPort() {
+        return this.serverPort;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof TcpGatewayConfig
+     */
+    isLocalModeEnabled() {
+        return this.localMode;
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof TcpGatewayConfig
+     */
+    build() {
+        return {
+            socks: this.socks,
+            serverIp: this.serverIp,
+            serverPort: this.serverPort
+        };
+    }
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a></li><li><a href="ClientError.html">ClientError</a></li><li><a href="ClientOptions.html">ClientOptions</a></li><li><a href="ComponentBuilder.html">ComponentBuilder</a></li><li><a href="ComponentOptions.html">ComponentOptions</a></li><li><a href="ComponentSession.html">ComponentSession</a></li><li><a href="ContainerBuilder.html">ContainerBuilder</a></li><li><a href="ContainerImageBuilder.html">ContainerImageBuilder</a></li><li><a href="ContainerRuntimeBuilder.html">ContainerRuntimeBuilder</a></li><li><a href="EmulatorBuilder.html">EmulatorBuilder</a></li><li><a href="InputBuilder.html">InputBuilder</a></li><li><a href="InputContentBuilder.html">InputContentBuilder</a></li><li><a href="MachineComponentBuilder.html">MachineComponentBuilder</a></li><li><a href="NetworkBuilder.html">NetworkBuilder</a></li><li><a href="NetworkComponentConfig.html">NetworkComponentConfig</a></li><li><a href="NetworkConfig.html">NetworkConfig</a></li><li><a href="NetworkSession.html">NetworkSession</a></li><li><a href="SaveImportRequest.html">SaveImportRequest</a></li><li><a href="SaveNewEnvironmentRequest.html">SaveNewEnvironmentRequest</a></li><li><a href="SaveObjectEnvironmentRequest.html">SaveObjectEnvironmentRequest</a></li><li><a href="SaveRevisionRequest.html">SaveRevisionRequest</a></li><li><a href="SaveUserSessionRequest.html">SaveUserSessionRequest</a></li><li><a href="TcpGatewayConfig.html">TcpGatewayConfig</a></li><li><a href="TransformStream.html">TransformStream</a></li><li><a href="UviMachineComponentBuilder.html">UviMachineComponentBuilder</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_fetch">_fetch</a></li><li><a href="global.html#assignRandomMac">assignRandomMac</a></li><li><a href="global.html#BwflaMouse">BwflaMouse</a></li><li><a href="global.html#hideClientCursor">hideClientCursor</a></li><li><a href="global.html#onmousedown">onmousedown</a></li><li><a href="global.html#onmousemove">onmousemove</a></li><li><a href="global.html#onmouseup">onmouseup</a></li><li><a href="global.html#requestPointerLock">requestPointerLock</a></li><li><a href="global.html#sendAltTab">sendAltTab</a></li><li><a href="global.html#sendEsc">sendEsc</a></li><li><a href="global.html#showClientCursor">showClientCursor</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Oct 08 2021 14:23:23 GMT+0200 (Mitteleuropäische Sommerzeit)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

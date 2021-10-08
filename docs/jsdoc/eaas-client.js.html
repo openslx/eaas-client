@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: eaas-client.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: eaas-client.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import {
+    NetworkSession
+} from "./lib/networkSession.js";
+import {
+    ComponentSession, 
+    SnapshotRequestBuilder
+} from "./lib/componentSession.js";
+
+import {
+    ComputeSession
+} from './lib/computeSession.js';
+
+import {
+    ClientError,
+    sendEsc,
+    sendCtrlAltDel,
+    sendAltTab,
+    _fetch,
+} from "./lib/util.js";
+
+
+import EventTarget from "./third_party/event-target/esm/index.js";
+
+export {
+    sendEsc,
+    sendCtrlAltDel,
+    sendAltTab
+};
+export {
+    ClientError,
+    SnapshotRequestBuilder
+};
+
+/**
+ * Main EaaS Client class 
+ *
+ *
+ * @export
+ * @class Client
+ * @extends {EventTarget}
+ * @param {URL} api_entrypoint 
+ * @param {Object} idToken 
+ * @param {Object} kbLayoutPrefs 
+ */
+export class Client extends EventTarget {
+    constructor(api_entrypoint, idToken = null,
+        {kbLayoutPrefs, emulatorContainer = document.getElementById("emulator-container")} = {}) {
+        super();
+        this.API_URL = api_entrypoint.replace(/([^:])(\/\/+)/g, '$1/').replace(/\/+$/, '');
+        this.container = undefined;
+        this.kbLayoutPrefs = kbLayoutPrefs ? kbLayoutPrefs : {
+            language: {
+                name: 'us'
+            },
+            layout: {
+                name: 'pc105'
+            }
+        };
+        this.idToken = idToken;
+
+        this.deleteOnUnload = true;
+
+        this.options = null;
+
+        this.sessions = [];
+
+        /**
+         * component session attached to browser canvas
+         */
+        this.activeView = null;
+        this.defaultView = null;
+
+        this.envsComponentsData = [];
+
+        this.isConnected = false;
+
+        this.xpraConf = {
+            xpraWidth: 640,
+            xpraHeight: 480,
+            xpraDPI: 96,
+            xpraEncoding: "jpeg"
+        };
+        this.emulatorContainer = emulatorContainer;
+
+        // ID for registered this.pollState() with setInterval()
+        this.pollStateIntervalId = null;
+
+        // Clean up on window close
+        window.addEventListener("beforeunload", () => {
+            if (this.deleteOnUnload)
+                this.release();
+        });
+    }
+    /**
+     *
+     *
+     * @param width
+     * @param height
+     * @param dpi
+     * @param xpraEncoding
+     * @memberof Client
+     */
+    setXpraConf(width, height, dpi, xpraEncoding) {
+        this.xpraConf = {
+            xpraWidth: width,
+            xpraHeight: height,
+            xpraDPI: dpi,
+            xpraEncoding: xpraEncoding
+        };
+    }
+
+    // ... token &amp;&amp;  { authorization : `Bearer ${token}`}, 
+    // ... obj &amp;&amp; {"content-type" : "application/json" }
+    // ...obj &amp;&amp; {body: JSON.stringify(obj) },
+
+    async _pollState() {
+        if (this.network) {
+            this.network.keepalive();
+        }
+
+        for (const session of this.sessions) {
+            if (session.getNetwork() &amp;&amp; !session.forceKeepalive)
+                continue;
+
+            let result = await session.getEmulatorState();
+            if (!result)
+                continue;
+
+            let emulatorState = result.state;
+
+            if (emulatorState == "OK" || emulatorState == "READY")
+                session.keepalive();
+            else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
+                if (this.onEmulatorStopped)
+                    this.onEmulatorStopped();
+                session.keepalive();
+                this.dispatchEvent(new CustomEvent("error", {
+                    detail: `${emulatorState}`
+                })); // .addEventListener("error", (e) => {})
+            } else
+                this.dispatchEvent(new CustomEvent("error", {
+                    detail: session
+                }));
+        }
+    }
+
+    /**
+     *
+     *
+     * @return
+     * @memberof Client
+     */
+    getActiveSession() {
+        return this.activeView;
+    }
+
+    /* 
+        needs to be a global client function, 
+        we may checkpoint more then a single machine in the future.
+    /**
+     *
+     *
+     * @param request
+     * @return
+     * @memberof Client
+     */
+    async checkpoint(request) {
+        let session = this.activeView;
+        this.disconnect();
+        return session.checkpoint(request);
+    }
+
+    /**
+     *
+     *
+     * @return
+     * @memberof Client
+     */
+    disconnect() {
+        if (!this.activeView) {
+            return;
+        }
+
+        let myNode = this.emulatorContainer;
+        // it's supposed to be faster, than / myNode.innerHTML = ''; /
+        while (myNode &amp;&amp; myNode.firstChild) {
+            myNode.removeChild(myNode.firstChild);
+        }
+        this.activeView.disconnect();
+        this.activeView = undefined;
+        this.container = undefined;
+        console.log("Viewer disconnected successfully.");
+    }
+
+    /**
+     *
+     *
+     * @param sessionId
+     * @param container
+     * @param environmentRequest
+     * @memberof Client
+     */
+    async attachNewEnv(sessionId, container, environmentRequest) {
+        let session = await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+        session.sessionId = sessionId;
+        this.load(session);
+
+        environmentRequest.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
+        let componentSession = await ComponentSession.createComponent(environmentRequest, this.API_URL, this.idToken);
+        this.pollStateIntervalId = setInterval(() => {
+            this._pollState();
+        }, 1500);
+
+        this._connectToNetwork(componentSession, sessionId);
+        componentSession.forceKeepalive = true;
+
+        this.network.sessionComponents.push(componentSession);
+        this.network.networkConfig.components.push({
+            componentId: componentSession.componentId,
+            networkLabel: "Temp Client"
+        });
+        this.sessions.push(componentSession);
+
+        await this.connect(container, componentSession);
+    }
+
+    /**
+     *
+     *
+     * @param sessionId
+     * @param container
+     * @param _componentId
+     * @memberof Client
+     */
+    async attach(sessionId, container, _componentId) {
+        let session = await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
+        session.sessionId = sessionId;
+        this.load(session);
+
+        let componentSession;
+        if (_componentId) {
+            componentSession = this.getSession(_componentId);
+        }
+        this.pollStateIntervalId = setInterval(() => {
+            this._pollState();
+        }, 1500);
+
+        console.log("attching component:" + componentSession);
+        await this.connect(container, componentSession);
+    }
+
+    /**
+     *
+     *
+     * @param components
+     * @param options
+     * @memberof Client
+     */
+    async start(components, options) {
+
+        if (options) {
+            console.log("setting xpra encoding to " + options.getXpraEncoding());
+            this.xpraConf.xpraEncoding = options.getXpraEncoding();
+        }
+        
+        try {
+            const promisedComponents = components.map(async component => {
+                component.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
+                let componentSession = await ComponentSession.createComponent(component, this.API_URL, this.idToken);
+                this.sessions.push(componentSession);
+                if (component.isInteractive() === true) {
+                    this.defaultView = componentSession;
+                }
+                return componentSession;
+            });
+
+            console.log("starting client side keep alive");
+            this.pollStateIntervalId = setInterval(() => {
+                this._pollState();
+            }, 1500);
+
+            await Promise.all(promisedComponents);
+
+            if(!options)
+                return;
+            if(options.isHeadlessCompute)
+            {
+                let compute = new ComputeSession(this.API_URL, this.idToken);
+                await compute.start(this.sessions, options);
+                // we do not need the keepalive anymore. 
+                clearInterval(this.pollStateIntervalId);
+                return compute;
+            }
+            else if ( options.isNetworkEnabled()) {
+                console.log("starting network...");
+                this.network = new NetworkSession(this.API_URL, this.idToken);
+                await this.network.startNetwork(this.sessions, options);
+            }
+        } catch (e) {
+            this.release(true);
+            console.log(e);
+            throw new ClientError("Starting environment session failed!", e);
+        }
+    }
+
+    /**
+     *
+     *
+     * @param session
+     * @memberof Client
+     */
+    load(session) {
+        const sessionId = session.sessionId;
+        const sessionComponents = session.components;
+        const networkInfo = session.network;
+
+        for (const sc of sessionComponents) {
+            if (sc.type !== "machine")
+                continue;
+
+            if (this.sessions.filter((sessionComp) => sessionComp.componentId === sc.componentId).length > 0)
+                continue;
+
+            let session = new ComponentSession(this.API_URL, sc.environmentId, sc.componentId, this.idToken);
+            this.sessions.push(session);
+        }
+
+        this.network = new NetworkSession(this.API_URL, this.idToken);
+        this.network.load(sessionId, this.sessions, networkInfo);
+    }
+
+    async _connectToNetwork(component, networkID) {
+        const result = await _fetch(`${this.API_URL}/networks/${networkID}/addComponentToSwitch`, "POST", {
+                componentId: component.getId(),
+            },
+            this.idToken);
+        return result;
+    }
+    /**
+     *
+     *
+     * @param {boolean} [destroyNetworks=false]
+     * @return
+     * @memberof Client
+     */
+    async release(destroyNetworks = false) {
+        console.log("released: " + destroyNetworks);
+        this.disconnect();
+        clearInterval(this.pollStateIntervalId);
+
+        if (this.network) {
+            // we do not release by default network session, as they are detached by default
+            if (destroyNetworks)
+                await this.network.release();
+            return;
+        }
+
+        let url;
+        for (const session of this.sessions) {
+            url = await session.stop();
+            await session.release();
+        }
+        this.sessions = [];
+        return url;
+    }
+
+    getSession(id) {
+        if (!this.network)
+            throw new Error("no sessions available");
+
+        return this.network.getSession(id);
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof Client
+     */
+    getSessions() {
+        if (!this.network) {
+            return [];
+        }
+
+        const sessionInfo = [];
+        let networkSessions = this.network.getSessions();
+
+        for (let session of networkSessions) {
+            const conf = this.network.getNetworkConfig(session.componentId);
+            let componentSession = this.getSession(conf.componentId);
+            console.log(componentSession);
+            sessionInfo.push({
+                id: conf.componentId,
+                title: conf.networkLabel
+            });
+        }
+        return sessionInfo;
+    }
+
+    /**
+     * 
+     *
+     * @param container
+     * @param view
+     * @memberof Client
+     */
+    async connect(container, view) {
+        if (!view) {
+            if(this.defaultView)
+            {
+                view = this.defaultView;
+            }
+            else
+            {
+                console.log("no view defined. using first session");
+                view = this.sessions[0];
+            }
+        }
+
+        if (this.activeView)
+            this.disconnect();
+
+        if (!view)
+            throw new Error("no active view possible");
+
+        this.activeView = view;
+        console.log(`Connecting viewer... @ ${container}`);
+        try {
+            await this.activeView.connect(container, this.xpraConf);
+            this.isConnected = true;
+        } catch (e) {
+            console.error("Connecting viewer failed!");
+            console.log(e);
+            this.activeView = undefined;
+        }
+    }
+    /**
+     *
+     *
+     * @param name
+     * @param detachTime_minutes
+     * @memberof Client
+     */
+    async detach(name, detachTime_minutes) {
+        if (!this.network)
+            throw new Error("No network session available");
+
+        await this.network.detach(name, detachTime_minutes);
+        window.onbeforeunload = () => {};
+        this.disconnect();
+    }
+    /**
+     *
+     *
+     * @return
+     * @memberof Client
+     */
+    async stop() {
+        // let activeSession = this.activeView;
+        let results = [];
+        this.disconnect();
+        for (const session of this.sessions) {
+            let result = await session.stop();
+            results.push({
+                id: session.getId(),
+                result: result
+            });
+        }
+        return results;
+    }
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a></li><li><a href="ClientError.html">ClientError</a></li><li><a href="ClientOptions.html">ClientOptions</a></li><li><a href="ComponentBuilder.html">ComponentBuilder</a></li><li><a href="ComponentOptions.html">ComponentOptions</a></li><li><a href="ComponentSession.html">ComponentSession</a></li><li><a href="ContainerBuilder.html">ContainerBuilder</a></li><li><a href="ContainerImageBuilder.html">ContainerImageBuilder</a></li><li><a href="ContainerRuntimeBuilder.html">ContainerRuntimeBuilder</a></li><li><a href="EmulatorBuilder.html">EmulatorBuilder</a></li><li><a href="InputBuilder.html">InputBuilder</a></li><li><a href="InputContentBuilder.html">InputContentBuilder</a></li><li><a href="MachineComponentBuilder.html">MachineComponentBuilder</a></li><li><a href="NetworkBuilder.html">NetworkBuilder</a></li><li><a href="NetworkComponentConfig.html">NetworkComponentConfig</a></li><li><a href="NetworkConfig.html">NetworkConfig</a></li><li><a href="NetworkSession.html">NetworkSession</a></li><li><a href="SaveImportRequest.html">SaveImportRequest</a></li><li><a href="SaveNewEnvironmentRequest.html">SaveNewEnvironmentRequest</a></li><li><a href="SaveObjectEnvironmentRequest.html">SaveObjectEnvironmentRequest</a></li><li><a href="SaveRevisionRequest.html">SaveRevisionRequest</a></li><li><a href="SaveUserSessionRequest.html">SaveUserSessionRequest</a></li><li><a href="TcpGatewayConfig.html">TcpGatewayConfig</a></li><li><a href="TransformStream.html">TransformStream</a></li><li><a href="UviMachineComponentBuilder.html">UviMachineComponentBuilder</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_fetch">_fetch</a></li><li><a href="global.html#assignRandomMac">assignRandomMac</a></li><li><a href="global.html#BwflaMouse">BwflaMouse</a></li><li><a href="global.html#hideClientCursor">hideClientCursor</a></li><li><a href="global.html#onmousedown">onmousedown</a></li><li><a href="global.html#onmousemove">onmousemove</a></li><li><a href="global.html#onmouseup">onmouseup</a></li><li><a href="global.html#requestPointerLock">requestPointerLock</a></li><li><a href="global.html#sendAltTab">sendAltTab</a></li><li><a href="global.html#sendEsc">sendEsc</a></li><li><a href="global.html#showClientCursor">showClientCursor</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Oct 08 2021 14:23:23 GMT+0200 (Mitteleuropäische Sommerzeit)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

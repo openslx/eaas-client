@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/containerBuilder.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/containerBuilder.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import {
+	_fetch
+} from "./util.js";
+
+/**
+ *
+ *
+ * @export
+ * @class ContainerBuilder
+ * @param imageSource
+ * @param urlString
+ * @param metadata
+ */
+export class ContainerBuilder {
+	constructor(imageSource, urlString, metadata) {
+		this.imageUrl = urlString;
+		this.name = undefined;
+		this.processArgs = null;
+		this.processEnvs = null;
+		this.inputFolder = "/input";
+		this.outputFolder = "/output";
+		this.imageType = imageSource;
+		this.title = null;
+		this.description = null;
+		this.author = null;
+		this.guiRequired = undefined;
+		this.customSubdir = undefined;
+		this.runtimeId = undefined;
+		this.serviceContainer = false;
+		this.enableNetwork = false;
+		this.serviceContainerId = undefined;
+		this.workingDir = null;
+		this.archive = "default";
+
+		if(metadata)
+		{
+			this.configureProcess(metadata.entryProcesses, metadata.envVariables);
+			this.setWorkDirectory(metadata.workingDir);
+		}
+	}
+	/**
+	 *
+	 * @param n
+	 * @memberOf ContainerBuilder
+	 */
+	setName(n) {
+		this.name = n;
+	}
+	/**
+	 *
+	 * @param d
+	 * @memberOf ContainerBuilder
+	 */
+	setWorkDirectory(d)
+	{
+		this.workingDir = d;
+	}
+	/**
+	 *
+	 * @param args
+	 * @param envs
+	 * @memberOf ContainerBuilder
+	 */
+	configureProcess(args, envs)
+	{
+		this.processArgs = args;
+		this.processEnvs = envs;
+	}
+	/**
+	 *
+	 * @param f
+	 * @memberOf ContainerBuilder
+	 */
+	setInputFolder(f)
+	{
+		this.inputFolder = f;
+	}
+	/**
+	 *
+	 * @param f
+	 * @memberOf ContainerBuilder
+	 */
+	setOutputFolder(f)
+	{
+		this.outputFolder = f;
+	}
+	/**
+	 *
+	 * @param t
+	 * @memberOf ContainerBuilder
+	 */
+	setTitle(t)
+	{
+		this.title = t;
+	}
+	/**
+	 *
+	 * @param d
+	 * @memberOf ContainerBuilder
+	 */
+	setDescription(d)
+	{
+		this.description = d;
+	}
+	/**
+	 *
+	 * @param a
+	 * @memberOf ContainerBuilder
+	 */
+	setAuthor(a)
+	{
+		this.author = a;
+	}
+	/**
+	 *
+	 * @param runtimeId
+	 * @memberOf ContainerBuilder
+	 */
+	setRuntime(runtimeId)
+	{
+		this.runtimeId = runtimeId;
+	}
+	/**
+	 *
+	 * @param b
+	 * @memberOf ContainerBuilder
+	 */
+	enableGui(b)
+	{
+		this.guiRequired = b;
+	}
+	/**
+	 *
+	 * @param b
+	 * @memberOf ContainerBuilder
+	 */
+	setEnableNetwork(b) {
+		this.enableNetwork = b;
+	}
+	/**
+	 *
+	 * @param a
+	 * @memberOf ContainerBuilder
+	 */
+	setArchive(a) {
+		this.archive = a;
+	}
+	/**
+	 *
+	 * @param name
+	 * @memberOf ContainerBuilder
+	 */
+	setServiceContainerId(name) {
+		if(name) {
+			this.serviceContainer = true;
+			this.serviceContainerId = name;
+		}
+		else {
+			this.serviceContainer = false;
+			this.serviceContainerId = undefined;
+		}
+	}
+	/**
+	 *
+	 * @param api
+	 * @param idToken
+	 * @return
+	 * @memberOf ContainerBuilder
+	 */
+	async build(api, idToken = null)
+	{
+		return await _fetch(`${api}EmilContainerData/importContainer`, "POST", this, idToken);
+	}
+}
+/**
+ *
+ *
+ * @export
+ * @class EmulatorBuilder
+ * @param url
+ * @param [metadata=null]
+ */
+export class EmulatorBuilder {
+	constructor(url, metadata=null) {
+		this.imageUrl = url;
+		this.metadata = metadata;
+	}
+	/**
+	 *
+	 * @param api
+	 * @param idToken
+	 * @return
+	 * @memberOf EmulatorBuilder
+	 */
+	async build(api, idToken = null)
+	{
+		return await _fetch(`${api}EmilContainerData/importEmulator`, "POST", this, idToken);
+	}
+}
+/**
+ *
+ *
+ * @export
+ * @class ContainerImageBuilder
+ * @param url
+ * @param containerSource
+ */
+export class ContainerImageBuilder {
+	constructor(url, containerSource) {
+		this.urlString = url;
+		this.containerType = containerSource;
+
+		if(this.containerType !== "rootfs" &amp;&amp;
+			this.containerType !== "simg" &amp;&amp;
+			this.containerType !== "dockerhub")
+			throw new Error(`invalid container source '${containerSource}'. valid types are rootfs, simg, dockerhub, readymade`);
+
+		this.tag = undefined;
+		this.digest = undefined;
+	}
+	/**
+	 *
+	 * @param tag
+	 * @memberOf ContainerImageBuilder
+	 */
+	setTag(tag) {
+		this.tag = tag;
+	}
+	/**
+	 *
+	 * @param d
+	 * @memberOf ContainerImageBuilder
+	 */
+	setDigest(d)
+	{
+		this.digest = d;
+	}
+	/**
+	 *
+	 * @param api
+	 * @param [idToken=null]
+	 * @return
+	 * @memberOf ContainerImageBuilder
+	 */
+	async build(api, idToken = null) {
+		return await _fetch(`${api}EmilContainerData/buildContainerImage`, "POST", this, idToken);
+	}
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a></li><li><a href="ClientError.html">ClientError</a></li><li><a href="ClientOptions.html">ClientOptions</a></li><li><a href="ComponentBuilder.html">ComponentBuilder</a></li><li><a href="ComponentOptions.html">ComponentOptions</a></li><li><a href="ComponentSession.html">ComponentSession</a></li><li><a href="ContainerBuilder.html">ContainerBuilder</a></li><li><a href="ContainerImageBuilder.html">ContainerImageBuilder</a></li><li><a href="ContainerRuntimeBuilder.html">ContainerRuntimeBuilder</a></li><li><a href="EmulatorBuilder.html">EmulatorBuilder</a></li><li><a href="InputBuilder.html">InputBuilder</a></li><li><a href="InputContentBuilder.html">InputContentBuilder</a></li><li><a href="MachineComponentBuilder.html">MachineComponentBuilder</a></li><li><a href="NetworkBuilder.html">NetworkBuilder</a></li><li><a href="NetworkComponentConfig.html">NetworkComponentConfig</a></li><li><a href="NetworkConfig.html">NetworkConfig</a></li><li><a href="NetworkSession.html">NetworkSession</a></li><li><a href="SaveImportRequest.html">SaveImportRequest</a></li><li><a href="SaveNewEnvironmentRequest.html">SaveNewEnvironmentRequest</a></li><li><a href="SaveObjectEnvironmentRequest.html">SaveObjectEnvironmentRequest</a></li><li><a href="SaveRevisionRequest.html">SaveRevisionRequest</a></li><li><a href="SaveUserSessionRequest.html">SaveUserSessionRequest</a></li><li><a href="TcpGatewayConfig.html">TcpGatewayConfig</a></li><li><a href="TransformStream.html">TransformStream</a></li><li><a href="UviMachineComponentBuilder.html">UviMachineComponentBuilder</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_fetch">_fetch</a></li><li><a href="global.html#assignRandomMac">assignRandomMac</a></li><li><a href="global.html#BwflaMouse">BwflaMouse</a></li><li><a href="global.html#hideClientCursor">hideClientCursor</a></li><li><a href="global.html#onmousedown">onmousedown</a></li><li><a href="global.html#onmousemove">onmousemove</a></li><li><a href="global.html#onmouseup">onmouseup</a></li><li><a href="global.html#requestPointerLock">requestPointerLock</a></li><li><a href="global.html#sendAltTab">sendAltTab</a></li><li><a href="global.html#sendEsc">sendEsc</a></li><li><a href="global.html#showClientCursor">showClientCursor</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Oct 08 2021 14:23:23 GMT+0200 (Mitteleuropäische Sommerzeit)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

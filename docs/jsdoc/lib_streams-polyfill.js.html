@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: lib/streams-polyfill.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: lib/streams-polyfill.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { WritableStream } from "../third_party/web-streams-polyfill/ponyfill.es6.mjs.js";
+import "../third_party/text-encode-transform-polyfill/text-encode-transform.js";
+
+const _writable = new WeakMap();
+const _readable = new WeakMap();
+const _writeController = new WeakMap();
+const _readController = new WeakMap();
+
+const call = (object, method, args) => {
+    const fun = object[method];
+    if (typeof fun === "undefined") return;
+    if (typeof fun !== "function") throw new TypeError();
+    return Reflect.apply(fun, object, args);
+}
+
+/**
+ * A polyfill for `TransformStream` that uses the native `ReadableStream`
+ * and `WritableStream` implementations.
+ */
+class TransformStream {
+    constructor(transformer = {}, writableStrategy = {}, readableStrategy = {}) {
+        let resolveRead = () => {};
+        const writable = new WritableStream({
+            start: (writeController) => {
+                _writeController.set(this, writeController);
+            },
+            write: async (chunk) => {
+                const readC = _readController.get(this);
+                if (readC.desiredSize &lt;= 0) {
+                    await new Promise(r => resolveRead = r);
+                }
+                return call(transformer, "transform", [chunk, controller]);
+            },
+            close: async () => {
+                await call(transformer, "flush", [controller]);
+                _readController.get(this).close();
+            },
+            abort: () => {
+                return _readController.get(this).error();
+            }
+        }, writableStrategy);
+        const readable = new ReadableStream({
+            start: (readController) => {
+                _readController.set(this, readController);
+                if (typeof transformer.start !== "function") return;
+                return transformer.start(controller);
+            },
+            pull: (chunk, controller) => {
+                resolveRead();
+            },
+            cancel(reason) {},
+
+        }, readableStrategy);
+        const controller = makeTransformStreamDefaultController(
+            _writeController.get(this), _readController.get(this));
+
+        _writable.set(this, writable);
+        _readable.set(this, readable);
+    }
+    get writable() {return _writable.get(this);}
+    get readable() {return _readable.get(this);}
+}
+
+export {TransformStream as default};
+
+const _readController2 = new WeakMap();
+const _writeController2 = new WeakMap();
+const _lastWrite = new WeakMap();
+
+const makeTransformStreamDefaultController = (writeController, readController) => {
+    const _this = Object.create(TransformStreamDefaultController.prototype);
+    _writeController2.set(_this, writeController);
+    _readController2.set(_this, readController);
+    return _this;
+}
+
+class TransformStreamDefaultController {
+    constructor() {throw new TypeError();}
+
+    get desiredSize() {
+        return _readController2.get(this).desiredSize;
+    }
+    enqueue(chunk) {
+        const ret = _readController2.get(this).enqueue(chunk);
+        _lastWrite.set(this, ret);
+        return ret;
+    }
+    error(reason) {
+        _writeController2.get(this).error(reason);
+        _readController2.get(this).error(reason);
+    }
+    terminate() {
+        _writeController2.get(this).error();
+        _readController2.get(this).close();
+    }
+}
+
+
+class WritableStreamDefaultWriter {
+    constructor(stream) {}
+
+    get closed() {return Promise.resolve();}
+    get desiredSize() {return 0;}
+    get ready() {return Promise.resolve();}
+
+    abort(reason) {}
+    close() {}
+    releaseLock() {}
+    write(chunk) {}
+}
+
+if (!globalThis.WritableStream) globalThis.WritableStream = WritableStream;
+if (!globalThis.TransformStream) globalThis.TransformStream = TransformStream;
+
+if (!ReadableStream.prototype.pipeThrough) ReadableStream.prototype.pipeThrough = function ({ writable, readable }) {
+    this.pipeTo(writable);
+    return readable;
+};
+
+if (!ReadableStream.prototype.pipeTo) ReadableStream.prototype.pipeTo = async function (writable) {
+    let writerThrew = false;
+    const writer = writable.getWriter();
+    try {
+        const reader = this.getReader();
+        for (let value; !({value} = await reader.read()).done;) {
+            try {
+                await writer.write(value);
+            } catch (e) {
+                writerThrew = true;
+                reader.close();
+                throw e;
+            }
+        }
+    } catch (e) {
+        if (!writerThrew) writer.abort(e);
+        throw e;
+    }
+    writer.close();
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Client.html">Client</a></li><li><a href="ClientError.html">ClientError</a></li><li><a href="ClientOptions.html">ClientOptions</a></li><li><a href="ComponentBuilder.html">ComponentBuilder</a></li><li><a href="ComponentOptions.html">ComponentOptions</a></li><li><a href="ComponentSession.html">ComponentSession</a></li><li><a href="ContainerBuilder.html">ContainerBuilder</a></li><li><a href="ContainerImageBuilder.html">ContainerImageBuilder</a></li><li><a href="ContainerRuntimeBuilder.html">ContainerRuntimeBuilder</a></li><li><a href="EmulatorBuilder.html">EmulatorBuilder</a></li><li><a href="InputBuilder.html">InputBuilder</a></li><li><a href="InputContentBuilder.html">InputContentBuilder</a></li><li><a href="MachineComponentBuilder.html">MachineComponentBuilder</a></li><li><a href="NetworkBuilder.html">NetworkBuilder</a></li><li><a href="NetworkComponentConfig.html">NetworkComponentConfig</a></li><li><a href="NetworkConfig.html">NetworkConfig</a></li><li><a href="NetworkSession.html">NetworkSession</a></li><li><a href="SaveImportRequest.html">SaveImportRequest</a></li><li><a href="SaveNewEnvironmentRequest.html">SaveNewEnvironmentRequest</a></li><li><a href="SaveObjectEnvironmentRequest.html">SaveObjectEnvironmentRequest</a></li><li><a href="SaveRevisionRequest.html">SaveRevisionRequest</a></li><li><a href="SaveUserSessionRequest.html">SaveUserSessionRequest</a></li><li><a href="TcpGatewayConfig.html">TcpGatewayConfig</a></li><li><a href="TransformStream.html">TransformStream</a></li><li><a href="UviMachineComponentBuilder.html">UviMachineComponentBuilder</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_fetch">_fetch</a></li><li><a href="global.html#assignRandomMac">assignRandomMac</a></li><li><a href="global.html#BwflaMouse">BwflaMouse</a></li><li><a href="global.html#hideClientCursor">hideClientCursor</a></li><li><a href="global.html#onmousedown">onmousedown</a></li><li><a href="global.html#onmousemove">onmousemove</a></li><li><a href="global.html#onmouseup">onmouseup</a></li><li><a href="global.html#requestPointerLock">requestPointerLock</a></li><li><a href="global.html#sendAltTab">sendAltTab</a></li><li><a href="global.html#sendEsc">sendEsc</a></li><li><a href="global.html#showClientCursor">showClientCursor</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.6</a> on Fri Oct 08 2021 14:23:23 GMT+0200 (Mitteleuropäische Sommerzeit)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
