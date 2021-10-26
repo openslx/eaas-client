@@ -194,7 +194,7 @@ globalThis.loadXpra = (
     // HACK: eaas-client might pass wrong URL
     const xpraUrl2 = new URL(xpraUrl, location);
     xpraUrl2.protocol = xpraUrl2.protocol.replace(/^http/, "ws");
-    if (location.protocol == "https:") xpraUrl2.protocol = "wss";
+    if (location.protocol == "https:" && xpraUrl2.hostname !== "localhost") xpraUrl2.protocol = "wss";
     xpraUrl = String(xpraUrl2);
   }
 
