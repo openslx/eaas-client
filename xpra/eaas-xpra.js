@@ -4,9 +4,11 @@ const patchXpra = () => {
 
   // TODO: Make configurable
   const translateId = (id) => (id === "screen" ? "emulator-container" : id);
+  const knownIds = {};
 
   document.getElementById = new Proxy(document.getElementById, {
     apply(target, thisArg, argArray) {
+      if (knownIds[argArray[0]]) return knownIds[argArray[0]];
       argArray[0] = translateId(argArray[0]);
       return Reflect.apply(target, thisArg, argArray);
     },
@@ -204,8 +206,9 @@ globalThis.loadXpra = (
 
   const client = new XpraClient("emulator-container");
   client.div = "emulator-container";
+  if (eaasClientObj.container) knownIds[client.div] = eaasClientObj.container;
 
-  const container = document.getElementById(client.div);
+  const container = eaasClientObj.container || document.getElementById(client.div);
   const windowsList = Object.assign(document.createElement("div"), {
     id: "open_windows_list",
     hidden: true,
