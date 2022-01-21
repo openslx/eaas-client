@@ -52,6 +52,8 @@ class EaasClientElement extends HTMLElement {
   async play() {
     const container = document.createElement("div");
     container.id = containerName;
+    container.style.position = "relative";
+    container.style.zIndex = "0";
     this.append(container);
     this.container = container;
     this.backendUrl = this.getAttribute("eaas-service");
