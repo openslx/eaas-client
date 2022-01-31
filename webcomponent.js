@@ -205,6 +205,8 @@ class EaasClientElement extends HTMLElement {
     if(this.session == null)
       this.session = client.getActiveSession();
 
+    if (this.session.hasPointerLock()) this.session.setPointerLock();
+
     for (const el of [...this.childNodes])
       if (el !== this.container) el.remove();
     
