@@ -106,11 +106,12 @@ class EaasClientElement extends HTMLElement {
         const type = medium.getAttribute("type");
 
         const objectId = medium.getAttribute("object-id");
+        const objectArchive = medium.getAttribute("object-archive");
 
         if(url && type)
           machine.addUserMedia(url, type);
         else if(objectId)
-          machine.setObject(objectId, "zero conf");
+          machine.setObject(objectId, objectArchive || "zero conf");
       }
     }
 
