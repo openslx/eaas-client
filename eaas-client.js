@@ -123,7 +123,7 @@ export class Client extends EventTarget {
 
             let emulatorState = result.state;
 
-            if (emulatorState == "OK" || emulatorState == "READY")
+            if (emulatorState == "INITIALIZING" || emulatorState == "RUNNING")
                 session.keepalive();
             else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                 if (this.onEmulatorStopped)
