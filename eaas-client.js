@@ -276,7 +276,7 @@ export class Client extends EventTarget {
                 this._pollState();
             }, 1500);
 
-            await Promise.all(promisedComponents);
+            let componentResult = await Promise.all(promisedComponents);
 
 
             if (options && options.isNetworkEnabled()) {
@@ -284,6 +284,7 @@ export class Client extends EventTarget {
                 this.network = new NetworkSession(this.API_URL, this.idToken);
                 await this.network.startNetwork(this.sessions, options);
             }
+            return componentResult
         } catch (e) {
             this.release(true);
             console.log(e);
