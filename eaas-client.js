@@ -123,7 +123,9 @@ export class Client extends EventTarget {
 
             let emulatorState = result.state;
 
-            if (emulatorState == "INITIALIZING" || emulatorState == "RUNNING")
+            if (emulatorState == "INITIALIZING" || emulatorState == "RUNNING" ||
+                // HACK: "OK" and "READY" are obsolete state names which might still be used by the eaas-server
+                emulatorState == "OK" || emulatorState == "READY")
                 session.keepalive();
             else if (emulatorState == "STOPPED" || emulatorState == "FAILED") {
                 if (this.onEmulatorStopped)
