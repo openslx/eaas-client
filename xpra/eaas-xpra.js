@@ -172,6 +172,19 @@ const patchXpra = () => {
     },
   });
 
+  XpraClient.prototype._get_desktop_size = new Proxy(
+    XpraClient.prototype._get_desktop_size,
+    {
+      apply(target, thisArg, argArray) {
+        // See XpraWindow.prototype.ensure_visible()
+        const min_visible = 10;
+        let ret = Reflect.apply(target, thisArg, argArray);
+        ret = ret.map((v) => Math.max(min_visible, v));
+        return ret;
+      },
+    }
+  );
+
   // For debug use in `xpra-html5/html5/index.html`
   /*
   XpraClient = new Proxy(XpraClient, {
