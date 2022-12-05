@@ -71,6 +71,7 @@ class EaasClientElement extends HTMLElement {
     const networkLabel = this.getAttribute("network-label");
     const containerId = this.getAttribute("container-id")?.match(/\/?([^/]+)$/)[1];
     const xpraEncoding = this.getAttribute("xpra-encoding");
+    const ghostCursor = this.getAttribute("ghostCursor");
 
     if(containerId && !envId)
       envId = this.getAttribute("container-runtime-id");
