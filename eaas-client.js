@@ -86,15 +86,7 @@ export class Client extends EventTarget {
                 this.release();
         });
     }
-    /**
-     *
-     *
-     * @param width
-     * @param height
-     * @param dpi
-     * @param xpraEncoding
-     * @memberof Client
-     */
+
     setXpraConf(width, height, dpi, xpraEncoding) {
         this.xpraConf = {
             xpraWidth: width,
@@ -141,12 +133,7 @@ export class Client extends EventTarget {
         }
     }
 
-    /**
-     *
-     *
-     * @return
-     * @memberof Client
-     */
+
     getActiveSession() {
         return this.activeView;
     }
@@ -154,12 +141,6 @@ export class Client extends EventTarget {
     /* 
         needs to be a global client function, 
         we may checkpoint more then a single machine in the future.
-    /**
-     *
-     *
-     * @param request
-     * @return
-     * @memberof Client
      */
     async checkpoint(request) {
         let session = this.activeView;
@@ -167,12 +148,7 @@ export class Client extends EventTarget {
         return session.checkpoint(request);
     }
 
-    /**
-     *
-     *
-     * @return
-     * @memberof Client
-     */
+
     disconnect() {
         if (!this.activeView) {
             return;
@@ -189,14 +165,7 @@ export class Client extends EventTarget {
         console.log("Viewer disconnected successfully.");
     }
 
-    /**
-     *
-     *
-     * @param sessionId
-     * @param container
-     * @param environmentRequest
-     * @memberof Client
-     */
+
     async attachNewEnv(sessionId, container, environmentRequest) {
         let session = await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
         session.sessionId = sessionId;
@@ -221,14 +190,7 @@ export class Client extends EventTarget {
         await this.connect(container, componentSession);
     }
 
-    /**
-     *
-     *
-     * @param sessionId
-     * @param container
-     * @param _componentId
-     * @memberof Client
-     */
+
     async attach(sessionId, container, _componentId) {
         let session = await _fetch(`${this.API_URL}/sessions/${sessionId}`, "GET", null, this.idToken);
         session.sessionId = sessionId;
@@ -246,20 +208,14 @@ export class Client extends EventTarget {
         await this.connect(container, componentSession);
     }
 
-    /**
-     *
-     *
-     * @param components
-     * @param options
-     * @memberof Client
-     */
+
     async start(components, options) {
 
         if (options) {
             console.log("setting xpra encoding to " + options.getXpraEncoding());
             this.xpraConf.xpraEncoding = options.getXpraEncoding();
         }
-        
+
         try {
             const promisedComponents = components.map(async component => {
                 component.setKeyboard(this.kbLayoutPrefs.language.name, this.kbLayoutPrefs.layout.name);
@@ -291,12 +247,7 @@ export class Client extends EventTarget {
         }
     }
 
-    /**
-     *
-     *
-     * @param session
-     * @memberof Client
-     */
+
     load(session) {
         const sessionId = session.sessionId;
         const sessionComponents = session.components;
@@ -324,13 +275,7 @@ export class Client extends EventTarget {
             this.idToken);
         return result;
     }
-    /**
-     *
-     *
-     * @param {boolean} [destroyNetworks=false]
-     * @return
-     * @memberof Client
-     */
+
     async release(destroyNetworks = false) {
         console.log("released: " + destroyNetworks);
         this.disconnect();
@@ -358,12 +303,7 @@ export class Client extends EventTarget {
 
         return this.network.getSession(id);
     }
-    /**
-     *
-     *
-     * @return
-     * @memberof Client
-     */
+
     getSessions() {
         if (!this.network) {
             return [];
@@ -384,13 +324,7 @@ export class Client extends EventTarget {
         return sessionInfo;
     }
 
-    /**
-     * 
-     *
-     * @param container
-     * @param view
-     * @memberof Client
-     */
+
     async connect(container, view) {
         if (!view) {
             if(this.defaultView)
@@ -421,13 +355,7 @@ export class Client extends EventTarget {
             this.activeView = undefined;
         }
     }
-    /**
-     *
-     *
-     * @param name
-     * @param detachTime_minutes
-     * @memberof Client
-     */
+
     async detach(name, detachTime_minutes) {
         if (!this.network)
             throw new Error("No network session available");
@@ -436,12 +364,7 @@ export class Client extends EventTarget {
         window.onbeforeunload = () => {};
         this.disconnect();
     }
-    /**
-     *
-     *
-     * @return
-     * @memberof Client
-     */
+
     async stop() {
         // let activeSession = this.activeView;
         let results = [];

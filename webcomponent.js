@@ -84,7 +84,7 @@ class EaasClientElement extends HTMLElement {
         userContainerEnvironment: containerId,
         userContainerArchive: imageArchive,
       });
-    
+
     this.client.onEmulatorStopped = async () => {
       let result = await this.client.release();
       console.log(result);
@@ -173,7 +173,7 @@ class EaasClientElement extends HTMLElement {
         networkBuilder.getNetworkConfig().archived_internet_date = internetDate;
         await networkBuilder.enableDhcpService(networkBuilder.getNetworkConfig());
       }
-     
+
       components = await networkBuilder.getComponents();
     }
 
@@ -210,7 +210,7 @@ class EaasClientElement extends HTMLElement {
 
     for (const el of [...this.childNodes])
       if (el !== this.container) el.remove();
-    
+
     monitorStateChanges();
   }
   attributeChangedCallback() {}
